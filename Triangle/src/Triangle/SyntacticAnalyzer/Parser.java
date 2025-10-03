@@ -97,7 +97,8 @@ public class Parser {
     catch (SyntaxError s) { return null; }
     return programAST;
   }
-
+  
+// <editor-fold defaultstate="collapsed" desc=" Literals ">    
 ///////////////////////////////////////////////////////////////////////////////
 //
 // LITERALS
@@ -175,7 +176,9 @@ public class Parser {
     }
     return O;
   }
-
+// </editor-fold>
+  
+// <editor-fold defaultstate="collapsed" desc=" Commands ">  
 ///////////////////////////////////////////////////////////////////////////////
 //
 // COMMANDS
@@ -270,6 +273,18 @@ public class Parser {
         commandAST = new WhileCommand(eAST, cAST, commandPos);
       }
       break;
+    
+    case Token.PACKAGE: 
+        {
+            acceptIt();
+            Identifier iAST = parseIdentifier();
+            accept(Token.IS);
+            Declaration dAST = parseDeclaration();
+            accept(Token.END);
+            finish(commandPos);
+            commandAST = new PackageCommand(iAST, dAST, commandPos);
+        }
+        break;
 
     case Token.SEMICOLON:
     case Token.END:
@@ -290,7 +305,9 @@ public class Parser {
 
     return commandAST;
   }
-
+// </editor-fold>
+  
+// <editor-fold defaultstate="collapsed" desc=" Expressions ">  
 ///////////////////////////////////////////////////////////////////////////////
 //
 // EXPRESSIONS
@@ -480,6 +497,9 @@ public class Parser {
     return aggregateAST;
   }
 
+// </editor-fold>
+
+// <editor-fold defaultstate="collapsed" desc=" Value / Variable Names ">  
 ///////////////////////////////////////////////////////////////////////////////
 //
 // VALUE-OR-VARIABLE NAMES
@@ -515,7 +535,10 @@ public class Parser {
     }
     return vAST;
   }
-
+  
+// </editor-fold>
+  
+// <editor-fold defaultstate="collapsed" desc=" Declarations ">  
 ///////////////////////////////////////////////////////////////////////////////
 //
 // DECLARATIONS
@@ -822,7 +845,10 @@ public class Parser {
     }
     return actualAST;
   }
+  
+// </editor-fold>
 
+// <editor-fold defaultstate="collapsed" desc=" Type Denoters ">  
 ///////////////////////////////////////////////////////////////////////////////
 //
 // TYPE-DENOTERS
@@ -895,4 +921,5 @@ public class Parser {
     }
     return fieldAST;
   }
+// </editor-fold>
 }

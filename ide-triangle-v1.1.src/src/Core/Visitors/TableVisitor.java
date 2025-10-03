@@ -43,6 +43,7 @@ import Triangle.AbstractSyntaxTrees.MultipleFieldTypeDenoter;
 import Triangle.AbstractSyntaxTrees.MultipleFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.MultipleRecordAggregate;
 import Triangle.AbstractSyntaxTrees.Operator;
+import Triangle.AbstractSyntaxTrees.PackageCommand;
 import Triangle.AbstractSyntaxTrees.ProcActualParameter;
 import Triangle.AbstractSyntaxTrees.ProcDeclaration;
 import Triangle.AbstractSyntaxTrees.ProcFormalParameter;
@@ -140,6 +141,13 @@ public class TableVisitor implements Visitor {
       
       return(null);
   }
+  
+  public Object visitPackageCommand(PackageCommand ast, Object o) {
+      ast.I.visit(this, null);
+      ast.D.visit(this, null);
+      return(null);
+  }
+  
   // </editor-fold>
 
   // <editor-fold defaultstate="collapsed" desc=" Expressions ">

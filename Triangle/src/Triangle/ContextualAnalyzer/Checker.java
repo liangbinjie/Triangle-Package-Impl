@@ -89,6 +89,14 @@ public final class Checker implements Visitor {
     return null;
   }
   
+  public Object visitPackageCommand(PackageCommand ast, Object o) {
+    ast.I.visit(this, null);
+    idTable.openScope();
+    ast.D.visit(this, null);
+    idTable.closeScope();
+    return null;
+  }
+  
   // Expressions
 
   // Returns the TypeDenoter denoting the type of the expression. Does

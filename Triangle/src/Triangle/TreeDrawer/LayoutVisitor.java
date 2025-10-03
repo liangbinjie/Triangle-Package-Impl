@@ -55,6 +55,7 @@ import Triangle.AbstractSyntaxTrees.MultipleFieldTypeDenoter;
 import Triangle.AbstractSyntaxTrees.MultipleFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.MultipleRecordAggregate;
 import Triangle.AbstractSyntaxTrees.Operator;
+import Triangle.AbstractSyntaxTrees.PackageCommand;
 import Triangle.AbstractSyntaxTrees.ProcActualParameter;
 import Triangle.AbstractSyntaxTrees.ProcDeclaration;
 import Triangle.AbstractSyntaxTrees.ProcFormalParameter;
@@ -116,9 +117,13 @@ public class LayoutVisitor implements Visitor {
   public Object visitSequentialCommand(SequentialCommand ast, Object obj) {
     return layoutBinary("Seq.Com.", ast.C1, ast.C2);
   }
-
+  
   public Object visitWhileCommand(WhileCommand ast, Object obj) {
     return layoutBinary("WhileCom.", ast.E, ast.C);
+  }
+  
+  public Object visitPackageCommand(PackageCommand ast, Object obj) {
+      return layoutBinary("PackageCom.", ast.I, ast.D);
   }
   
   // Expressions
