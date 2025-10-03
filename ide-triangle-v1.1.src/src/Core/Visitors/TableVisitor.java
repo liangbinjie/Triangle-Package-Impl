@@ -26,6 +26,7 @@ import Triangle.AbstractSyntaxTrees.EmptyCommand;
 import Triangle.AbstractSyntaxTrees.EmptyExpression;
 import Triangle.AbstractSyntaxTrees.EmptyFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.ErrorTypeDenoter;
+import Triangle.AbstractSyntaxTrees.ExportDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncActualParameter;
 import Triangle.AbstractSyntaxTrees.FuncDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
@@ -314,6 +315,11 @@ public class TableVisitor implements Visitor {
       } catch (NullPointerException e) { }
       
       ast.T.visit(this, null);
+      return(null);
+  }
+  
+  public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
+      ast.I.visit(this, o);
       return(null);
   }
   

@@ -26,6 +26,7 @@ import Triangle.AbstractSyntaxTrees.EmptyCommand;
 import Triangle.AbstractSyntaxTrees.EmptyExpression;
 import Triangle.AbstractSyntaxTrees.EmptyFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.ErrorTypeDenoter;
+import Triangle.AbstractSyntaxTrees.ExportDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncActualParameter;
 import Triangle.AbstractSyntaxTrees.FuncDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
@@ -201,6 +202,10 @@ public class TreeVisitor implements Visitor {
     
     public Object visitVarDeclaration(VarDeclaration ast, Object obj) {
         return(createBinary("Variable Declaration", ast.I, ast.T));
+    }
+    
+    public Object visitExportDeclaration(ExportDeclaration ast, Object obj) {
+        return(createUnary("Export Declaration", ast.I));
     }
     // </editor-fold>
     

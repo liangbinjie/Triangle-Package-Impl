@@ -38,6 +38,7 @@ import Triangle.AbstractSyntaxTrees.EmptyCommand;
 import Triangle.AbstractSyntaxTrees.EmptyExpression;
 import Triangle.AbstractSyntaxTrees.EmptyFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.ErrorTypeDenoter;
+import Triangle.AbstractSyntaxTrees.ExportDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncActualParameter;
 import Triangle.AbstractSyntaxTrees.FuncDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
@@ -203,6 +204,10 @@ public class LayoutVisitor implements Visitor {
 
   public Object visitVarDeclaration(VarDeclaration ast, Object obj) {
     return layoutBinary("VarDecl.", ast.I, ast.T);
+  }
+  
+  public Object visitExportDeclaration(ExportDeclaration ast, Object obj) {
+    return layoutUnary("ExportDecl.", ast.I);
   }
 
 

@@ -14,7 +14,6 @@
 
 package Triangle.SyntacticAnalyzer;
 
-import java.util.LinkedHashMap;
 
 import Triangle.ErrorReporter;
 import Triangle.AbstractSyntaxTrees.*;
@@ -579,6 +578,29 @@ public class Parser {
         declarationAST = new ConstDeclaration(iAST, eAST, declarationPos);
       }
       break;
+      
+    case Token.EXPORT:
+    {
+        acceptIt();
+    
+        // Parsea el primer identificador
+        Identifier firstId = parseIdentifier();
+        Declaration currentExport = new ExportDeclaration(firstId, declarationPos);
+
+        // Si existe mas elementos que exportar
+        while (currentToken.kind == Token.COMMA) {
+            acceptIt();
+            Identifier nextId = parseIdentifier();
+            ExportDeclaration nextExport = new ExportDeclaration(nextId, declarationPos);
+
+            // Encadenar los exports usando sequentialDeclaration
+            currentExport = new SequentialDeclaration(currentExport, nextExport, declarationPos);
+        }
+
+        finish(declarationPos);
+        declarationAST = currentExport;
+    }
+    break;
 
     case Token.VAR:
       {

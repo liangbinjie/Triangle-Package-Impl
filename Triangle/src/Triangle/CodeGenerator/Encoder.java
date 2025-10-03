@@ -48,6 +48,7 @@ import Triangle.AbstractSyntaxTrees.EmptyCommand;
 import Triangle.AbstractSyntaxTrees.EmptyExpression;
 import Triangle.AbstractSyntaxTrees.EmptyFormalParameterSequence;
 import Triangle.AbstractSyntaxTrees.ErrorTypeDenoter;
+import Triangle.AbstractSyntaxTrees.ExportDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncActualParameter;
 import Triangle.AbstractSyntaxTrees.FuncDeclaration;
 import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
@@ -361,6 +362,11 @@ public final class Encoder implements Visitor {
     writeTableDetails(ast);
     return new Integer(extraSize);
   }
+  
+  public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
+      // es posible que se necesite agregar mas logica
+    return new Integer(0);
+}
 
 
   // Array Aggregates

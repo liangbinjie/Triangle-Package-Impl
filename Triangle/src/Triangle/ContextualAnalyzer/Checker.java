@@ -295,6 +295,26 @@ public final class Checker implements Visitor {
 
     return null;
   }
+  
+  public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
+    // se verifica que exista al menos un identificador
+    Declaration binding = (Declaration) ast.I.visit(this, null);
+    
+    if (binding == null) {
+        reportUndeclared(ast.I);
+    } else {
+        // Se declara que se puede exportar
+        if (!(binding instanceof ProcDeclaration) &&
+            !(binding instanceof FuncDeclaration) && 
+            !(binding instanceof TypeDeclaration) &&
+            !(binding instanceof ConstDeclaration) &&
+            !(binding instanceof VarDeclaration)) {
+            reporter.reportError("\"%\" cannot be exported", ast.I.spelling, ast.I.position);
+        }
+    }
+    
+    return null;
+}
 
   // Array Aggregates
 
