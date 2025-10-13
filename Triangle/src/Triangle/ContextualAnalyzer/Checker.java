@@ -23,6 +23,13 @@ import Triangle.AbstractSyntaxTrees.*;
 import Triangle.SyntacticAnalyzer.SourcePosition;
 
 public final class Checker implements Visitor {
+    
+    //proyectyo paquetes
+    @Override
+    public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+        // TODO: aquí luego cargarás el paquete (.tpk) e insertarás símbolos
+        return null;
+    }
 
   // Commands
 

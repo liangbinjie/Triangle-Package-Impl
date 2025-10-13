@@ -1,0 +1,9 @@
+let
+  import Utils;
+  const x ~ 1;
+  proc main() ~
+    begin
+      ! nada por ahora
+    end
+in
+  main()

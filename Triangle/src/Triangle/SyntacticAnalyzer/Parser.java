@@ -567,6 +567,41 @@ public class Parser {
     start(declarationPos);
 
     switch (currentToken.kind) {
+        
+    case Token.IMPORT: {
+        SourcePosition pos = new SourcePosition();
+        start(pos);
+
+        accept(Token.IMPORT);
+        Identifier pkg = parseIdentifier();
+
+        finish(pos);
+        declarationAST = new ImportDeclaration(pkg, /* names */ null, pos); // import P
+    }
+    break;
+
+    case Token.FROM: 
+        {
+            SourcePosition pos = new SourcePosition();
+            start(pos);
+
+            accept(Token.FROM);
+            Identifier pkg = parseIdentifier();
+            accept(Token.IMPORT);
+
+            java.util.List<Identifier> list = new java.util.ArrayList<>();
+            list.add(parseIdentifier());
+            while (currentToken.kind == Token.COMMA) {
+                acceptIt();
+                list.add(parseIdentifier());
+            }
+
+            finish(pos);
+            Identifier[] names = list.toArray(new Identifier[0]);
+            declarationAST = new ImportDeclaration(pkg, names, pos); // from P import a, b
+        }
+        break;
+     
 
     case Token.CONST:
       {

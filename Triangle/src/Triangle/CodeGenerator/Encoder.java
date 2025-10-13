@@ -93,8 +93,17 @@ import Triangle.AbstractSyntaxTrees.Visitor;
 import Triangle.AbstractSyntaxTrees.Vname;
 import Triangle.AbstractSyntaxTrees.VnameExpression;
 import Triangle.AbstractSyntaxTrees.WhileCommand;
+import Triangle.AbstractSyntaxTrees.ImportDeclaration;
+
 
 public final class Encoder implements Visitor {
+
+    //para proyecto
+    @Override
+    public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+        // Import no ocupa espacio en tiempo de ejecución
+        return new Integer(0);
+    }
 
 
   // Commands
