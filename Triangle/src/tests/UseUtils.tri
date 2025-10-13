@@ -1,0 +1,10 @@
+let
+  from Utils import min, max;
+  const r ~ min(5, 9);
+  proc main() ~
+    begin
+      putint(r);
+      puteol()
+    end
+in
+  main()

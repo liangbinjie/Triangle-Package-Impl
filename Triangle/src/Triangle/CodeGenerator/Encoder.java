@@ -96,14 +96,34 @@ import Triangle.AbstractSyntaxTrees.WhileCommand;
 import Triangle.AbstractSyntaxTrees.ImportDeclaration;
 
 
-public final class Encoder implements Visitor {
 
-    //para proyecto
-    @Override
-    public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
-        // Import no ocupa espacio en tiempo de ejecución
-        return new Integer(0);
+
+public final class Encoder implements Visitor {
+    
+    //para linker// Encoder.java (campos)
+private String currentPackageName = null; // ahora sí se usa
+private java.util.Set<Declaration> exportedDecls = new java.util.HashSet<>();
+private java.util.List<String> exportLines = new java.util.ArrayList<>(); // "export <qname> <addr>"
+private java.util.List<String> importLines = new java.util.ArrayList<>(); // "import <qname>"
+private java.util.Map<Declaration,String> importedNames = new java.util.HashMap<>();
+
+
+@Override
+public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+  if (ast.names != null && ast.packageId != null) {
+    for (Identifier id : ast.names) {
+      String qname = ast.packageId.spelling + "." + id.spelling;
+      importLines.add("import " + qname);
+      // opcional para depurar:
+      // System.out.println("IMPORT -> " + qname);
     }
+  }
+  return Integer.valueOf(0);
+}
+
+
+
+
 
 
   // Commands
@@ -171,10 +191,44 @@ public final class Encoder implements Visitor {
     return null;
   }
   
-  public Object visitPackageCommand(PackageCommand ast, Object o) {
-      // se debe de implementar algo?
-      return null;
+@Override
+public Object visitPackageCommand(PackageCommand ast, Object o) {
+  this.currentPackageName = ast.I.spelling;
+
+  // Genera el código de todas las D (funcs, procs, exports, etc.)
+  Object res = ast.D.visit(this, o);
+
+  // Al final, ya todas las entidades tienen dirección.
+  exportLines.clear();
+  for (Declaration d : exportedDecls) {
+    String name = null;
+    ObjectAddress addr = null;
+
+    if (d instanceof FuncDeclaration) {
+      FuncDeclaration fd = (FuncDeclaration) d;
+      name = fd.I.spelling;
+      if (fd.entity instanceof KnownRoutine) {
+        addr = ((KnownRoutine) fd.entity).address;
+      }
+    } else if (d instanceof ProcDeclaration) {
+      ProcDeclaration pd = (ProcDeclaration) d;
+      name = pd.I.spelling;
+      if (pd.entity instanceof KnownRoutine) {
+        addr = ((KnownRoutine) pd.entity).address;
+      }
+    }
+
+    if (name != null && addr != null) {
+      String qname = currentPackageName + "." + name;
+      exportLines.add("export " + qname + " " + addr.displacement);
+    }
   }
+
+  // (No escribas aquí el archivo; ya lo haces en encodeRun si exportLines no está vacío)
+  return res;
+}
+
+
   
   // Expressions
   public Object visitArrayExpression(ArrayExpression ast, Object o) {
@@ -305,6 +359,16 @@ public final class Encoder implements Visitor {
     emit(Machine.JUMPop, 0, Machine.CBr, 0);
     ast.entity = new KnownRoutine(Machine.closureSize, frame.level, nextInstrAddr);
     writeTableDetails(ast);
+    
+    if (exportedDecls.contains(ast)) {
+  if (ast.entity instanceof KnownRoutine) {
+    ObjectAddress addr = ((KnownRoutine) ast.entity).address;
+    String qname = (currentPackageName != null ? currentPackageName + "." + ast.I.spelling
+                                               : ast.I.spelling);
+    exportLines.add("export " + qname + " " + addr.displacement);
+  }
+}
+    
     if (frame.level == Machine.maxRoutineLevel)
       reporter.reportRestriction("can't nest routines more than 7 deep");
     else {
@@ -327,6 +391,16 @@ public final class Encoder implements Visitor {
     ast.entity = new KnownRoutine (Machine.closureSize, frame.level,
                                 nextInstrAddr);
     writeTableDetails(ast);
+    
+    if (exportedDecls.contains(ast)) {
+  if (ast.entity instanceof KnownRoutine) {
+    ObjectAddress addr = ((KnownRoutine) ast.entity).address;
+    String qname = (currentPackageName != null ? currentPackageName + "." + ast.I.spelling
+                                               : ast.I.spelling);
+    exportLines.add("export " + qname + " " + addr.displacement);
+  }
+}
+    
     if (frame.level == Machine.maxRoutineLevel)
       reporter.reportRestriction("can't nest routines so deeply");
     else {
@@ -372,10 +446,14 @@ public final class Encoder implements Visitor {
     return new Integer(extraSize);
   }
   
-  public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
-      // es posible que se necesite agregar mas logica
-    return new Integer(0);
+@Override
+public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
+  if (ast.I.decl instanceof Declaration) {
+    exportedDecls.add((Declaration) ast.I.decl);
+  }
+  return Integer.valueOf(0);
 }
+
 
 
   // Array Aggregates
@@ -751,12 +829,39 @@ public final class Encoder implements Visitor {
   // Generates code to run a program.
   // showingTable is true iff entity description details
   // are to be displayed.
-  public final void encodeRun (Program theAST, boolean showingTable) {
-    tableDetailsReqd = showingTable;
-    //startCodeGeneration();
-    theAST.visit(this, new Frame (0, 0));
-    emit(Machine.HALTop, 0, 0, 0);
+  
+  private void writeLinesToFile(String path, java.util.List<String> lines) {
+  try (java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileOutputStream(path))) {
+    for (String s : lines) pw.println(s);
+  } catch (IOException ex) {
+    // si quieres: System.err.println("No se pudo escribir " + path + ": " + ex.getMessage());
   }
+}
+  
+public final void encodeRun(Program theAST, boolean showingTable) {
+  tableDetailsReqd = showingTable;
+
+  // Reset de estado por seguridad
+  currentPackageName = null;
+  exportedDecls.clear();
+  exportLines.clear();
+  importLines.clear();
+
+  theAST.visit(this, new Frame(0, 0));
+  emit(Machine.HALTop, 0, 0, 0);
+
+  // Dump para el linker
+  if (currentPackageName != null) {
+    if (!exportLines.isEmpty()) {
+      writeLinesToFile(currentPackageName + ".map", exportLines);
+    }
+  } else {
+    writeLinesToFile("program.imp", importLines);
+  }
+}
+
+  
+  
 
   // Decides run-time representation of a standard constant.
   private final void elaborateStdConst (Declaration constDeclaration,

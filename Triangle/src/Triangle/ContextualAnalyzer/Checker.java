@@ -115,46 +115,55 @@ private String formalToString(FormalParameter fp) {
     
     //proyecto paquetes
     @Override
-    public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
-        PackageArtifact art = null;
-        try {
-            art = PackageLoader.load(ast.packageId.spelling);
-        } catch (Exception ex) {
-            reporter.reportError("package \"" + ast.packageId.spelling + "\" not found", "", ast.position);
-            return null;
-        }
+public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+  PackageArtifact art = null;
+  try {
+    art = PackageLoader.load(ast.packageId.spelling);
+  } catch (Exception ex) {
+    reporter.reportError("package \"" + ast.packageId.spelling + "\" not found", "", ast.position);
+    return null;
+  }
 
-        // Construye índice nombre -> ExportEntry
-        Map<String, ExportEntry> index = new HashMap<>();
-        for (ExportEntry e : art.exports) index.put(e.name, e);
+  // índice del .tpk
+  java.util.Map<String, ExportEntry> index = new java.util.HashMap<>();
+  for (ExportEntry e : art.exports) index.put(e.name, e);
 
-        if (ast.names != null) {
-            // from P import a, b
-            for (Identifier want : ast.names) {
-                ExportEntry e = index.get(want.spelling);
-                if (e == null) {
-                    reporter.reportError("\"" + want.spelling + "\" is not exported by package \"" + art.packageName + "\"", "", want.position);
-                    continue;
-                }
-                // Crear declaración sintética con la firma y meterla al scope
-                Declaration d = makeSyntheticDeclForExport(e, want.position);
-                idTable.enter(want.spelling, d); // ahora el checker conocerá min/max/etc.
-            }
-        } else {
-            // import P  -> registra el nombre del módulo en la tabla como "marcador"
-            // Usamos un VarDeclaration con AnyTypeDenoter como marcador de módulo
-            AnyTypeDenoter any = new AnyTypeDenoter(ast.position);
-            VarDeclaration moduleMarker = new VarDeclaration(ast.packageId, any, ast.position);
-            idTable.enter(ast.packageId.spelling, moduleMarker);
+  // ¿tenemos el paquete “vivo” en esta corrida?
+  java.util.Map<String, Declaration> live = livePackages.get(ast.packageId.spelling);
 
-            // Nota: con la gramática actual no existen llamadas calificadas (P.x(...)).
-            // Más adelante podemos agregar soporte para 'P.x' en VNames (p.ej. para constantes/vars),
-            // pero para llamadas a funciones/procedimientos la vía práctica es `from P import x`.
-        }
-        return null;
+  if (ast.names != null) {
+    // from P import a, b
+    for (Identifier want : ast.names) {
+      ExportEntry e = index.get(want.spelling);
+      if (e == null) {
+        reporter.reportError("\"" + want.spelling + "\" is not exported by package \"" + art.packageName + "\"", "", want.position);
+        continue;
+      }
+
+      Declaration d = null;
+
+      // Preferir la declaración real si existe
+      if (live != null) {
+        d = live.get(want.spelling);
+      }
+
+      // Si no hay real, crear sintética desde el .tpk
+      if (d == null) {
+        d = makeSyntheticDeclForExport(e, want.position);
+      }
+
+      idTable.enter(want.spelling, d);
     }
 
-   
+  } else {
+    // import P -> por ahora solo marcador de módulo
+    AnyTypeDenoter any = new AnyTypeDenoter(ast.position);
+    VarDeclaration moduleMarker = new VarDeclaration(ast.packageId, any, ast.position);
+    idTable.enter(ast.packageId.spelling, moduleMarker);
+  }
+  return null;
+}
+
     // --- Reconstrucción de tipos básicos desde el texto del .tpk ---
     private TypeDenoter basicTypeFromName(String n) {
         if (n.equals("Integer")) return StdEnvironment.integerType;
@@ -339,7 +348,7 @@ private String formalToString(FormalParameter fp) {
   
 @Override
 public Object visitPackageCommand(PackageCommand ast, Object o) {
-  // 1) Chequear normalmente el bloque de declaraciones del paquete
+  // 1) Chequear declaraciones del paquete
   ast.D.visit(this, o);
 
   // 2) Índice nombre->Declaration (para conocer kind y tipos)
@@ -350,12 +359,17 @@ public Object visitPackageCommand(PackageCommand ast, Object o) {
   java.util.List<String> names = new java.util.ArrayList<>();
   collectExportNames(ast.D, names);
 
-  // 4) Construir artefacto con kind + firma reales
+  // 4) Artefacto con kind + firma para el .tpk
   PackageArtifact art = new PackageArtifact();
   art.packageName = ast.I.spelling;
 
+  // 4b) Mapa “vivo” con las declaraciones reales exportadas
+  java.util.Map<String, Declaration> live = new java.util.HashMap<>();
+
   for (String n : names) {
     Declaration d = index.get(n);
+    if (d == null) continue;
+
     String kind = "unknown";
     String sig  = "";
 
@@ -363,31 +377,27 @@ public Object visitPackageCommand(PackageCommand ast, Object o) {
       FuncDeclaration fd = (FuncDeclaration)d;
       kind = "func";
       sig  = "func(" + fpsToString(fd.FPS) + "):" + typeToString(fd.T);
-
     } else if (d instanceof ProcDeclaration) {
       ProcDeclaration pd = (ProcDeclaration)d;
       kind = "proc";
       sig  = "proc(" + fpsToString(pd.FPS) + ")";
-
     } else if (d instanceof VarDeclaration) {
       VarDeclaration vd = (VarDeclaration)d;
       kind = "var";
       sig  = ":" + typeToString(vd.T);
-
     } else if (d instanceof TypeDeclaration) {
       TypeDeclaration td = (TypeDeclaration)d;
       kind = "type";
       sig  = "type " + td.I.spelling;
-
     } else if (d instanceof ConstDeclaration) {
       ConstDeclaration cd = (ConstDeclaration)d;
       kind = "const";
-      // si el checker ya tipó la expresión, intenta exponer el tipo:
       String t = (cd.E != null && cd.E.type != null) ? typeToString(cd.E.type) : "?";
       sig = ":" + t;
     }
 
     art.exports.add(PackageLoader.mk(n, kind, sig));
+    live.put(n, d); // ← guarda la decl real para esta corrida
   }
 
   try {
@@ -395,6 +405,9 @@ public Object visitPackageCommand(PackageCommand ast, Object o) {
   } catch (Exception ex) {
     reporter.reportError("cannot save package \"" + ast.I.spelling + "\"", "", ast.position);
   }
+
+  // 5) Registra el paquete "vivo"
+  livePackages.put(ast.I.spelling, live);
 
   return null;
 }
@@ -1033,6 +1046,9 @@ public Object visitPackageCommand(PackageCommand ast, Object o) {
   private IdentificationTable idTable;
   private static SourcePosition dummyPos = new SourcePosition();
   private ErrorReporter reporter;
+  
+   private final java.util.Map<String, java.util.Map<String, Triangle.AbstractSyntaxTrees.Declaration>> livePackages
+           = new java.util.HashMap<>();
 
   // Reports that the identifier or operator used at a leaf of the AST
   // has not been declared.

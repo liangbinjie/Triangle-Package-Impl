@@ -1,0 +1,2 @@
+export Utils.max 10
+export Utils.min 1
