@@ -1,0 +1,4 @@
+package MathEx ~
+  func square(n: Integer): Integer ~ n * n;
+  export square
+end
