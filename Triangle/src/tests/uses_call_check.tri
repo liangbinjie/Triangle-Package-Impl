@@ -1,0 +1,7 @@
+let
+  from Utils import min;
+  ! NO compiles a TAM todavía si no implementamos el enlazado
+  const r ~ min(5, 9);
+  proc main() ~ begin end
+in
+  main()

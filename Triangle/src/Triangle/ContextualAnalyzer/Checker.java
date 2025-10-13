@@ -16,6 +16,8 @@ package Triangle.ContextualAnalyzer;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+                                                                                            
+import java.util.*;
 
 import Triangle.ErrorReporter;
 import Triangle.StdEnvironment;
@@ -54,10 +56,66 @@ public final class Checker implements Visitor {
 
     }
     
-    //proyectyo paquetes
+    // --- indexa declaraciones por nombre ---
+    private void indexDeclarations(Declaration d, java.util.Map<String, Declaration> out) {
+        if (d == null) return;
+        if (d instanceof SequentialDeclaration) {
+            SequentialDeclaration sd = (SequentialDeclaration) d;
+            indexDeclarations(sd.D1, out);
+            indexDeclarations(sd.D2, out);
+            return;
+        }
+        if (d instanceof ConstDeclaration)   out.put(((ConstDeclaration)d).I.spelling, d);
+        else if (d instanceof VarDeclaration)   out.put(((VarDeclaration)d).I.spelling, d);
+        else if (d instanceof TypeDeclaration)  out.put(((TypeDeclaration)d).I.spelling, d);
+        else if (d instanceof ProcDeclaration)  out.put(((ProcDeclaration)d).I.spelling, d);
+        else if (d instanceof FuncDeclaration)  out.put(((FuncDeclaration)d).I.spelling, d);
+        // ExportDeclaration no define nombres nuevos
+    }
+
+// --- a texto: tipos y firmas ---
+private String typeToString(TypeDenoter t) {
+  if (t == StdEnvironment.integerType) return "Integer";
+  if (t == StdEnvironment.booleanType) return "Boolean";
+  if (t == StdEnvironment.charType)    return "Char";
+  if (t instanceof SimpleTypeDenoter)  return ((SimpleTypeDenoter)t).I.spelling;
+  if (t instanceof ArrayTypeDenoter) {
+    ArrayTypeDenoter at = (ArrayTypeDenoter)t;
+    return "array " + at.IL.spelling + " of " + typeToString(at.T);
+  }
+  if (t instanceof RecordTypeDenoter)  return "record ... end";
+  return "unknown";
+}
+
+private String fpsToString(FormalParameterSequence fps) {
+  if (fps instanceof EmptyFormalParameterSequence) return "";
+  if (fps instanceof SingleFormalParameterSequence)
+    return formalToString(((SingleFormalParameterSequence)fps).FP);
+  if (fps instanceof MultipleFormalParameterSequence) {
+    MultipleFormalParameterSequence m = (MultipleFormalParameterSequence)fps;
+    return formalToString(m.FP) + "," + fpsToString(m.FPS);
+  }
+  return "";
+}
+
+private String formalToString(FormalParameter fp) {
+  if (fp instanceof ConstFormalParameter) {
+    return typeToString(((ConstFormalParameter)fp).T);
+  } else if (fp instanceof VarFormalParameter) {
+    return "var " + typeToString(((VarFormalParameter)fp).T);
+  } else if (fp instanceof ProcFormalParameter) {
+    return "proc(" + fpsToString(((ProcFormalParameter)fp).FPS) + ")";
+  } else if (fp instanceof FuncFormalParameter) {
+    FuncFormalParameter f = (FuncFormalParameter)fp;
+    return "func(" + fpsToString(f.FPS) + "):" + typeToString(f.T);
+  }
+  return "?";
+}
+
+    
+    //proyecto paquetes
     @Override
     public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
-        // Cargar .tpk del paquete
         PackageArtifact art = null;
         try {
             art = PackageLoader.load(ast.packageId.spelling);
@@ -66,30 +124,153 @@ public final class Checker implements Visitor {
             return null;
         }
 
-        // Guardar temporalmente en este checker para el siguiente paso (módulos)
-        // Por ahora, solo validamos que los nombres existan cuando es "from P import ..."
+        // Construye índice nombre -> ExportEntry
+        Map<String, ExportEntry> index = new HashMap<>();
+        for (ExportEntry e : art.exports) index.put(e.name, e);
+
         if (ast.names != null) {
             // from P import a, b
-            java.util.Set<String> exported = new java.util.HashSet<>();
-            for (ExportEntry e : art.exports) exported.add(e.name);
-
             for (Identifier want : ast.names) {
-                if (!exported.contains(want.spelling)) {
-                    reporter.reportError(
-                    "\"" + want.spelling + "\" is not exported by package \"" + ast.packageId.spelling + "\"",
-                    "",
-                    want.position
-                    );
+                ExportEntry e = index.get(want.spelling);
+                if (e == null) {
+                    reporter.reportError("\"" + want.spelling + "\" is not exported by package \"" + art.packageName + "\"", "", want.position);
+                    continue;
                 }
-                // Próximo paso: insertar 'want' como símbolo en el scope actual con su tipo/firma.
+                // Crear declaración sintética con la firma y meterla al scope
+                Declaration d = makeSyntheticDeclForExport(e, want.position);
+                idTable.enter(want.spelling, d); // ahora el checker conocerá min/max/etc.
             }
         } else {
-            // import P   → próximo paso: registrar el MÓDULO 'P' en la tabla
-            // para poder hacer P.x. Aquí aún no insertamos nada (no rompe).
+            // import P  -> registra el nombre del módulo en la tabla como "marcador"
+            // Usamos un VarDeclaration con AnyTypeDenoter como marcador de módulo
+            AnyTypeDenoter any = new AnyTypeDenoter(ast.position);
+            VarDeclaration moduleMarker = new VarDeclaration(ast.packageId, any, ast.position);
+            idTable.enter(ast.packageId.spelling, moduleMarker);
+
+            // Nota: con la gramática actual no existen llamadas calificadas (P.x(...)).
+            // Más adelante podemos agregar soporte para 'P.x' en VNames (p.ej. para constantes/vars),
+            // pero para llamadas a funciones/procedimientos la vía práctica es `from P import x`.
         }
         return null;
     }
 
+   
+    // --- Reconstrucción de tipos básicos desde el texto del .tpk ---
+    private TypeDenoter basicTypeFromName(String n) {
+        if (n.equals("Integer")) return StdEnvironment.integerType;
+        if (n.equals("Boolean")) return StdEnvironment.booleanType;
+        if (n.equals("Char"))    return StdEnvironment.charType;
+        // Si aparece algo no estándar, devuelve errorType para no romper
+        return StdEnvironment.errorType;
+    }
+
+    // "Integer,var Integer,Boolean" -> lista de pares (isVar, TypeDenoter)
+    private List<Object[]> parseParamList(String s) {
+        ArrayList<Object[]> ps = new ArrayList<>();
+        if (s == null || s.trim().isEmpty()) return ps;
+        for (String raw : s.split(",")) {
+            String t = raw.trim();
+            boolean isVar = false;
+            if (t.startsWith("var ")) {
+                isVar = true;
+                t = t.substring(4).trim();
+            }
+            ps.add(new Object[]{Boolean.valueOf(isVar), basicTypeFromName(t)});
+        }
+        return ps;
+    }
+
+    // "func(Integer,Integer):Integer" -> [ "func", paramsText, retTypeName ]
+    // "proc(Integer,var Boolean)"     -> [ "proc", paramsText, null        ]
+    private String[] splitSig(String sig) {
+        sig = sig.trim();
+        if (sig.startsWith("func")) {
+            int lp = sig.indexOf('(');
+            int rp = sig.lastIndexOf(')');
+            int colon = sig.lastIndexOf(':');
+            String params = (lp>=0 && rp>lp) ? sig.substring(lp+1, rp) : "";
+            String ret    = (colon>rp) ? sig.substring(colon+1).trim() : "";
+            return new String[]{"func", params, ret};
+        }
+        if (sig.startsWith("proc")) {
+            int lp = sig.indexOf('(');
+            int rp = sig.lastIndexOf(')');
+            String params = (lp>=0 && rp>lp) ? sig.substring(lp+1, rp) : "";
+            return new String[]{"proc", params, null};
+        }
+        return new String[]{"unknown", "", null};
+    }
+    
+    // Construye la FPS desde la lista parseada
+    private FormalParameterSequence makeFPS(List<Object[]> params, SourcePosition pos) {
+        if (params.isEmpty()) return new EmptyFormalParameterSequence(pos);
+        // construir recursivamente MultipleFormalParameterSequence
+        FormalParameter fp = makeFP(params.get(0), pos);
+        if (params.size() == 1) {
+            return new SingleFormalParameterSequence(fp, pos);
+        } else {
+            List<Object[]> tail = params.subList(1, params.size());
+            return new MultipleFormalParameterSequence(fp, makeFPS(tail, pos), pos);
+        }
+    }
+
+    private FormalParameter makeFP(Object[] p, SourcePosition pos) {
+        boolean isVar = ((Boolean)p[0]).booleanValue();
+        TypeDenoter t = (TypeDenoter)p[1];
+        // Inventamos un identificador dummy (no se usa) para parámetros formales
+        Identifier dummy = new Identifier("_", pos);
+        if (isVar) return new VarFormalParameter(dummy, t, pos);
+        return new ConstFormalParameter(dummy, t, pos);
+    }
+    
+    private Declaration makeSyntheticDeclForExport(ExportEntry e, SourcePosition pos) {
+        String[] parts = splitSig(e.typeSig);
+        String kind = e.kind == null ? "unknown" : e.kind;
+
+        Identifier name = new Identifier(e.name, pos);
+
+        if ("func".equals(kind) && "func".equals(parts[0])) {
+            List<Object[]> params = parseParamList(parts[1]);
+            TypeDenoter ret = basicTypeFromName(parts[2] == null ? "" : parts[2]);
+            FormalParameterSequence fps = makeFPS(params, pos);
+            // Cuerpo vacío: el checker solo necesita la firma
+            Expression emptyBody = new EmptyExpression(pos);
+            return new FuncDeclaration(name, fps, ret, emptyBody, pos);
+        }
+
+        if ("proc".equals(kind) && "proc".equals(parts[0])) {
+            List<Object[]> params = parseParamList(parts[1]);
+            FormalParameterSequence fps = makeFPS(params, pos);
+            Command empty = new EmptyCommand(pos);
+            return new ProcDeclaration(name, fps, empty, pos);
+        }
+
+        if ("var".equals(kind)) {
+            // var x : T (sin valor)
+            // Para imports solo nos interesa el tipo
+            TypeDenoter t = StdEnvironment.errorType; // si necesitas var reales, exporta la firma ":T" y parsea
+            return new VarDeclaration(name, t, pos);
+        }
+
+        if ("type".equals(kind)) {
+            // type X = ...  (placeholder con nombre)
+            TypeDenoter t = StdEnvironment.errorType;
+            return new TypeDeclaration(name, t, pos);
+        }
+
+        if ("const".equals(kind)) {
+            // const c : T ~ ?  (placeholder)
+            Expression empty = new EmptyExpression(pos);
+            return new ConstDeclaration(name, empty, pos);
+        }
+
+        // Desconocido: crea algo inocuo para no romper
+        return new VarDeclaration(name, StdEnvironment.errorType, pos);
+    }
+
+
+    
+    
 
   // Commands
 
@@ -156,34 +337,68 @@ public final class Checker implements Visitor {
     return null;
   }
   
-  @Override
-    public Object visitPackageCommand(PackageCommand ast, Object o) {
-        // 1) Chequear normalmente el bloque de declaraciones del paquete
-        ast.D.visit(this, o);
+@Override
+public Object visitPackageCommand(PackageCommand ast, Object o) {
+  // 1) Chequear normalmente el bloque de declaraciones del paquete
+  ast.D.visit(this, o);
 
-        // 2) Recolectar nombres exportados (a partir de ExportDeclaration en el árbol)
-        java.util.List<String> names = new java.util.ArrayList<>();
-        collectExportNames(ast.D, names);
+  // 2) Índice nombre->Declaration (para conocer kind y tipos)
+  java.util.Map<String, Declaration> index = new java.util.HashMap<>();
+  indexDeclarations(ast.D, index);
 
-        // 3) Construir artefacto y guardar .tpk
-        PackageArtifact art = new PackageArtifact();
-        art.packageName = ast.I.spelling;
-        for (String n : names) {
-            // Por ahora 'kind' y 'typeSig' van básicos. En el siguiente paso derivamos la firma real.
-            art.exports.add(PackageLoader.mk(n, "unknown", ""));
-        }
+  // 3) Recolectar nombres exportados
+  java.util.List<String> names = new java.util.ArrayList<>();
+  collectExportNames(ast.D, names);
 
-        try {
-            PackageLoader.save(art);
-        } catch (Exception ex) {
-            // Reportar como error contextual amigable
-            reporter.reportError("cannot save package \"" + ast.I.spelling + "\"", "", ast.position);
-        }
+  // 4) Construir artefacto con kind + firma reales
+  PackageArtifact art = new PackageArtifact();
+  art.packageName = ast.I.spelling;
 
-        // Un package no genera código TAM por sí mismo; devolvemos null
-        return null;
+  for (String n : names) {
+    Declaration d = index.get(n);
+    String kind = "unknown";
+    String sig  = "";
+
+    if (d instanceof FuncDeclaration) {
+      FuncDeclaration fd = (FuncDeclaration)d;
+      kind = "func";
+      sig  = "func(" + fpsToString(fd.FPS) + "):" + typeToString(fd.T);
+
+    } else if (d instanceof ProcDeclaration) {
+      ProcDeclaration pd = (ProcDeclaration)d;
+      kind = "proc";
+      sig  = "proc(" + fpsToString(pd.FPS) + ")";
+
+    } else if (d instanceof VarDeclaration) {
+      VarDeclaration vd = (VarDeclaration)d;
+      kind = "var";
+      sig  = ":" + typeToString(vd.T);
+
+    } else if (d instanceof TypeDeclaration) {
+      TypeDeclaration td = (TypeDeclaration)d;
+      kind = "type";
+      sig  = "type " + td.I.spelling;
+
+    } else if (d instanceof ConstDeclaration) {
+      ConstDeclaration cd = (ConstDeclaration)d;
+      kind = "const";
+      // si el checker ya tipó la expresión, intenta exponer el tipo:
+      String t = (cd.E != null && cd.E.type != null) ? typeToString(cd.E.type) : "?";
+      sig = ":" + t;
     }
-  
+
+    art.exports.add(PackageLoader.mk(n, kind, sig));
+  }
+
+  try {
+    PackageLoader.save(art);
+  } catch (Exception ex) {
+    reporter.reportError("cannot save package \"" + ast.I.spelling + "\"", "", ast.position);
+  }
+
+  return null;
+}
+
   // Expressions
 
   // Returns the TypeDenoter denoting the type of the expression. Does

@@ -2,6 +2,7 @@ let
   from Utils import min, max;
   proc main() ~
     begin
+      ! aquí el checker ya conoce min y max
     end
 in
   main()
