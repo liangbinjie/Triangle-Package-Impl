@@ -106,6 +106,9 @@ private java.util.Set<Declaration> exportedDecls = new java.util.HashSet<>();
 private java.util.List<String> exportLines = new java.util.ArrayList<>(); // "export <qname> <addr>"
 private java.util.List<String> importLines = new java.util.ArrayList<>(); // "import <qname>"
 private java.util.Map<Declaration,String> importedNames = new java.util.HashMap<>();
+private java.util.Map<String,String> importedByName = new java.util.HashMap<>();
+private java.util.List<String> relocLines = new java.util.ArrayList<>();
+private boolean isCompilingProgram() { return currentPackageName == null; }
 
 
 @Override
@@ -114,12 +117,20 @@ public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
     for (Identifier id : ast.names) {
       String qname = ast.packageId.spelling + "." + id.spelling;
       importLines.add("import " + qname);
-      // opcional para depurar:
-      // System.out.println("IMPORT -> " + qname);
+
+      // Mapa por Declaration (ya estaba)
+      if (id.decl instanceof Declaration) {
+        importedNames.put((Declaration) id.decl, qname);
+      }
+
+      // [PKG-LINK FIX] NUEVO: también guardar por nombre simple
+      importedByName.put(id.spelling, qname);
     }
   }
   return Integer.valueOf(0);
 }
+
+
 
 
 
@@ -715,28 +726,62 @@ public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
     return null;
   }
 
-  public Object visitIdentifier(Identifier ast, Object o) {
-    Frame frame = (Frame) o;
-    if (ast.decl.entity instanceof KnownRoutine) {
-      ObjectAddress address = ((KnownRoutine) ast.decl.entity).address;
-      emit(Machine.CALLop, displayRegister(frame.level, address.level),
-       Machine.CBr, address.displacement);
-    } else if (ast.decl.entity instanceof UnknownRoutine) {
-      ObjectAddress address = ((UnknownRoutine) ast.decl.entity).address;
-      emit(Machine.LOADop, Machine.closureSize, displayRegister(frame.level,
-           address.level), address.displacement);
-      emit(Machine.CALLIop, 0, 0, 0);
-    } else if (ast.decl.entity instanceof PrimitiveRoutine) {
-      int displacement = ((PrimitiveRoutine) ast.decl.entity).displacement;
-      if (displacement != Machine.idDisplacement)
-        emit(Machine.CALLop, Machine.SBr, Machine.PBr, displacement);
-    } else if (ast.decl.entity instanceof EqualityRoutine) { // "=" or "\="
-      int displacement = ((EqualityRoutine) ast.decl.entity).displacement;
-      emit(Machine.LOADLop, 0, 0, frame.size / 2);
-      emit(Machine.CALLop, Machine.SBr, Machine.PBr, displacement);
-    }
+@Override
+public Object visitIdentifier(Identifier ast, Object o) {
+  Frame frame = (Frame) o;
+
+  // [PKG-LINK FIX] 1) Caso importado por instancia de Declaration
+  if (isCompilingProgram()
+      && ast.decl instanceof Declaration
+      && importedNames.containsKey((Declaration) ast.decl)) {
+
+    String qname = importedNames.get((Declaration) ast.decl);
+    int callInstrIndex = nextInstrAddr;
+
+    // Llamada a rutina top-level (nivel destino 0)
+    emit(Machine.CALLop, displayRegister(frame.level, 0), Machine.CBr, 0);
+
+    relocLines.add("reloc " + qname + " " + callInstrIndex);
+    // System.out.println("[reloc decl] " + qname + " @ " + callInstrIndex);
     return null;
   }
+
+  // [PKG-LINK FIX] 2) Fallback: caso importado por NOMBRE simple (cuando no coincide Declaration)
+  if (isCompilingProgram()) {
+    String qnameByName = importedByName.get(ast.spelling);
+    if (qnameByName != null) {
+      int callInstrIndex = nextInstrAddr;
+
+      emit(Machine.CALLop, displayRegister(frame.level, 0), Machine.CBr, 0);
+
+      relocLines.add("reloc " + qnameByName + " " + callInstrIndex);
+      // System.out.println("[reloc name] " + qnameByName + " @ " + callInstrIndex);
+      return null;
+    }
+  }
+
+  // --- comportamiento original para no-importados ---
+  if (ast.decl.entity instanceof KnownRoutine) {
+    ObjectAddress address = ((KnownRoutine) ast.decl.entity).address;
+    emit(Machine.CALLop, displayRegister(frame.level, address.level),
+         Machine.CBr, address.displacement);
+  } else if (ast.decl.entity instanceof UnknownRoutine) {
+    ObjectAddress address = ((UnknownRoutine) ast.decl.entity).address;
+    emit(Machine.LOADop, Machine.closureSize, displayRegister(frame.level,
+         address.level), address.displacement);
+    emit(Machine.CALLIop, 0, 0, 0);
+  } else if (ast.decl.entity instanceof PrimitiveRoutine) {
+    int displacement = ((PrimitiveRoutine) ast.decl.entity).displacement;
+    if (displacement != Machine.idDisplacement)
+      emit(Machine.CALLop, Machine.SBr, Machine.PBr, displacement);
+  } else if (ast.decl.entity instanceof EqualityRoutine) {
+    int displacement = ((EqualityRoutine) ast.decl.entity).displacement;
+    emit(Machine.LOADLop, 0, 0, frame.size / 2);
+    emit(Machine.CALLop, Machine.SBr, Machine.PBr, displacement);
+  }
+  return null;
+}
+
 
   public Object visitIntegerLiteral(IntegerLiteral ast, Object o) {
     return null;
@@ -841,24 +886,31 @@ public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
 public final void encodeRun(Program theAST, boolean showingTable) {
   tableDetailsReqd = showingTable;
 
-  // Reset de estado por seguridad
   currentPackageName = null;
   exportedDecls.clear();
   exportLines.clear();
   importLines.clear();
+  relocLines.clear();
+  importedNames.clear();
+  importedByName.clear(); // [PKG-LINK FIX] NUEVO
 
   theAST.visit(this, new Frame(0, 0));
   emit(Machine.HALTop, 0, 0, 0);
 
-  // Dump para el linker
+  System.out.println("[Encoder] relocLines size = " + relocLines.size()
+                     + " | imports=" + importLines.size()
+                     + " | currentPackageName=" + currentPackageName);
+
   if (currentPackageName != null) {
-    if (!exportLines.isEmpty()) {
-      writeLinesToFile(currentPackageName + ".map", exportLines);
-    }
+    if (!exportLines.isEmpty()) writeLinesToFile(currentPackageName + ".map", exportLines);
   } else {
-    writeLinesToFile("program.imp", importLines);
+    if (!importLines.isEmpty()) writeLinesToFile("program.imp", importLines);
+    if (!relocLines.isEmpty())  writeLinesToFile("program.reloc", relocLines);
   }
 }
+
+
+
 
   
   
