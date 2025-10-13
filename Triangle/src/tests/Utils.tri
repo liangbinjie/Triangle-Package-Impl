@@ -1,0 +1,5 @@
+package Utils ~
+  func min(a: Integer, b: Integer): Integer ~ if a < b then a else b;
+  func max(a: Integer, b: Integer): Integer ~ if a > b then a else b;
+  export min, max
+end

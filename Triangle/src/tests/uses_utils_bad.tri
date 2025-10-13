@@ -1,0 +1,7 @@
+let
+  from Utils import nope;
+  proc main() ~
+    begin
+    end
+in
+  main()

@@ -1,0 +1,7 @@
+let
+  from Utils import min, max;
+  proc main() ~
+    begin
+    end
+in
+  main()

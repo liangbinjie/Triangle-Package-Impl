@@ -21,15 +21,75 @@ import Triangle.ErrorReporter;
 import Triangle.StdEnvironment;
 import Triangle.AbstractSyntaxTrees.*;
 import Triangle.SyntacticAnalyzer.SourcePosition;
+import Triangle.ContextualAnalyzer.PackageLoader;
+import Triangle.ContextualAnalyzer.PackageLoader.PackageArtifact;
+import Triangle.ContextualAnalyzer.PackageLoader.ExportEntry;
+import Triangle.AbstractSyntaxTrees.ImportDeclaration;
+import Triangle.AbstractSyntaxTrees.PackageCommand;
+import Triangle.AbstractSyntaxTrees.ExportDeclaration;
+import Triangle.AbstractSyntaxTrees.SequentialDeclaration;
+import Triangle.AbstractSyntaxTrees.Identifier;
+import Triangle.SyntacticAnalyzer.SourcePosition;
+
 
 public final class Checker implements Visitor {
+    
+    //helpers para que funcione este proyecto
+    private void collectExportNames(Triangle.AbstractSyntaxTrees.Declaration d, java.util.List<String> out) {
+        if (d == null) return;
+
+        if (d instanceof SequentialDeclaration) {
+            SequentialDeclaration sd = (SequentialDeclaration) d;
+            collectExportNames(sd.D1, out);
+            collectExportNames(sd.D2, out);
+            return;
+        }
+
+        if (d instanceof ExportDeclaration) {
+            ExportDeclaration ed = (ExportDeclaration) d;
+            Identifier id = ed.I; // asumiendo campo público I en ExportDeclaration
+            if (id != null) out.add(id.spelling);
+            return;
+        }
+
+    }
     
     //proyectyo paquetes
     @Override
     public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
-        // TODO: aquí luego cargarás el paquete (.tpk) e insertarás símbolos
+        // Cargar .tpk del paquete
+        PackageArtifact art = null;
+        try {
+            art = PackageLoader.load(ast.packageId.spelling);
+        } catch (Exception ex) {
+            reporter.reportError("package \"" + ast.packageId.spelling + "\" not found", "", ast.position);
+            return null;
+        }
+
+        // Guardar temporalmente en este checker para el siguiente paso (módulos)
+        // Por ahora, solo validamos que los nombres existan cuando es "from P import ..."
+        if (ast.names != null) {
+            // from P import a, b
+            java.util.Set<String> exported = new java.util.HashSet<>();
+            for (ExportEntry e : art.exports) exported.add(e.name);
+
+            for (Identifier want : ast.names) {
+                if (!exported.contains(want.spelling)) {
+                    reporter.reportError(
+                    "\"" + want.spelling + "\" is not exported by package \"" + ast.packageId.spelling + "\"",
+                    "",
+                    want.position
+                    );
+                }
+                // Próximo paso: insertar 'want' como símbolo en el scope actual con su tipo/firma.
+            }
+        } else {
+            // import P   → próximo paso: registrar el MÓDULO 'P' en la tabla
+            // para poder hacer P.x. Aquí aún no insertamos nada (no rompe).
+        }
         return null;
     }
+
 
   // Commands
 
@@ -96,13 +156,33 @@ public final class Checker implements Visitor {
     return null;
   }
   
-  public Object visitPackageCommand(PackageCommand ast, Object o) {
-    ast.I.visit(this, null);
-    idTable.openScope();
-    ast.D.visit(this, null);
-    idTable.closeScope();
-    return null;
-  }
+  @Override
+    public Object visitPackageCommand(PackageCommand ast, Object o) {
+        // 1) Chequear normalmente el bloque de declaraciones del paquete
+        ast.D.visit(this, o);
+
+        // 2) Recolectar nombres exportados (a partir de ExportDeclaration en el árbol)
+        java.util.List<String> names = new java.util.ArrayList<>();
+        collectExportNames(ast.D, names);
+
+        // 3) Construir artefacto y guardar .tpk
+        PackageArtifact art = new PackageArtifact();
+        art.packageName = ast.I.spelling;
+        for (String n : names) {
+            // Por ahora 'kind' y 'typeSig' van básicos. En el siguiente paso derivamos la firma real.
+            art.exports.add(PackageLoader.mk(n, "unknown", ""));
+        }
+
+        try {
+            PackageLoader.save(art);
+        } catch (Exception ex) {
+            // Reportar como error contextual amigable
+            reporter.reportError("cannot save package \"" + ast.I.spelling + "\"", "", ast.position);
+        }
+
+        // Un package no genera código TAM por sí mismo; devolvemos null
+        return null;
+    }
   
   // Expressions
 

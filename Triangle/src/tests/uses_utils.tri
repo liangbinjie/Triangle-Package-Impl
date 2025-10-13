@@ -1,0 +1,6 @@
+let
+  from Utils import min, max;
+  const x ~ 1
+in
+  ! aún no llamamos min/max (eso requiere el paso de símbolos)
+  proc main() ~ begin end
