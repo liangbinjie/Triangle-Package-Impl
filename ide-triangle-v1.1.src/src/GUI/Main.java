@@ -174,6 +174,7 @@ public class Main extends javax.swing.JFrame {
         triangleToolBar = new javax.swing.JToolBar();
         buttonCompile = new javax.swing.JButton();
         buttonRun = new javax.swing.JButton();
+        buttonLinkRun = new javax.swing.JButton(); // New button
         desktopPane = new javax.swing.JDesktopPane();
         menuBar = new javax.swing.JMenuBar();
         fileMenu = new javax.swing.JMenu();
@@ -321,7 +322,6 @@ public class Main extends javax.swing.JFrame {
                 compileMenuItemActionPerformed(evt);
             }
         });
-
         triangleToolBar.add(buttonCompile);
 
         buttonRun.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconTriangleRun.gif")));
@@ -336,8 +336,22 @@ public class Main extends javax.swing.JFrame {
                 runMenuItemActionPerformed(evt);
             }
         });
-
         triangleToolBar.add(buttonRun);
+
+        // --- New Link & Run button ---
+        buttonLinkRun.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconTriangleRun.gif")));
+        buttonLinkRun.setToolTipText("Link");
+        buttonLinkRun.setBorder(javax.swing.BorderFactory.createEmptyBorder(3, 3, 3, 3));
+        buttonLinkRun.setBorderPainted(false);
+        buttonLinkRun.setEnabled(true);
+        buttonLinkRun.setFocusPainted(false);
+        buttonLinkRun.setFocusable(false);
+        buttonLinkRun.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                linkRunButtonActionPerformed(evt);
+            }
+        });
+        triangleToolBar.add(buttonLinkRun);
 
         toolBarsPanel.add(triangleToolBar);
 
@@ -828,6 +842,7 @@ public class Main extends javax.swing.JFrame {
     javax.swing.JButton buttonPaste;
     javax.swing.JButton buttonRun;
     javax.swing.JButton buttonSave;
+    javax.swing.JButton buttonLinkRun; // New button for Link & Run
     javax.swing.JMenuItem compileMenuItem;
     javax.swing.JMenuItem copyMenuItem;
     javax.swing.JMenuItem cutMenuItem;
@@ -911,4 +926,38 @@ public class Main extends javax.swing.JFrame {
     }
     
     // </editor-fold>
+
+    // --- New Link & Run action implementation ---
+    private void linkRunButtonActionPerformed(java.awt.event.ActionEvent evt) {
+        try {
+            String triFile = desktopPane.getSelectedFrame().getTitle();
+            if (!triFile.endsWith(".tri")) {
+                JOptionPane.showMessageDialog(this, "Not a Triangle source file.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            String tamFile = triFile.replace(".tri", ".tam");
+            // 1. Link
+            Process linker = new ProcessBuilder(
+                "java", "-cp", "./Triangle.jar:./build/classes", "Triangle.Tools.Linker", tamFile
+            ).inheritIO().start();
+            int linkResult = linker.waitFor();
+            if (linkResult != 0) {
+                JOptionPane.showMessageDialog(this, "Linking failed.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            // 2. Rename linked.tam to {current_file_name}.tam
+            java.nio.file.Files.move(
+                java.nio.file.Paths.get("linked.tam"),
+                java.nio.file.Paths.get(tamFile),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            );
+            // 3. Run
+            Process interpreter = new ProcessBuilder(
+                "java", "-cp", "./Triangle.jar", "TAM.Interpreter", tamFile
+            ).inheritIO().start();
+            interpreter.waitFor();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Link & Run failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
 }
