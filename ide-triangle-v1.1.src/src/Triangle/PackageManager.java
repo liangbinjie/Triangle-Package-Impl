@@ -40,9 +40,10 @@ public class PackageManager {
         if (!dir.exists()) {
             boolean created = dir.mkdirs();
             if (created) {
-                System.out.println("Created package directory: " + path);
+                // Comentar o eliminar este println que causa el error
+                // System.out.println("Created package directory: " + path);
             } else {
-                System.err.println("Failed to create package directory: " + path);
+                // System.err.println("Failed to create package directory: " + path);
                 return false;
             }
         }
@@ -52,14 +53,15 @@ public class PackageManager {
     public void addPackagePath(String path) {
         // Asegurar que el directorio existe
         if (!ensureDirectoryExists(path)) {
-            System.err.println("Cannot add non-existent path: " + path);
+            // System.err.println("Cannot add non-existent path: " + path);
             return;
         }
         
         if (!packagePaths.contains(path)) {
             packagePaths.add(path);
             scanPackagesInPath(path);
-            System.out.println("Added package path: " + path);
+            // Comentar o eliminar este println
+            // System.out.println("Added package path: " + path);
         }
     }
     
@@ -143,7 +145,8 @@ public class PackageManager {
                     }
                 }
             } catch (IOException | NumberFormatException e) {
-                System.err.println("Error reading map file: " + e.getMessage());
+                // Silenciar error o manejarlo de otra manera
+                // System.err.println("Error reading map file: " + e.getMessage());
             }
         }
         
@@ -155,5 +158,21 @@ public class PackageManager {
      */
     public String getDefaultPackageDirectory() {
         return System.getProperty("user.dir") + File.separator + "packages";
+    }
+    
+    /**
+     * Versión silenciosa para logging (no usa System.out)
+     */
+    public String getStatusMessage() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Package paths: ").append(packagePaths.size()).append("\n");
+        for (String path : packagePaths) {
+            sb.append("  - ").append(path).append("\n");
+        }
+        sb.append("Available packages: ").append(packageLocations.size()).append("\n");
+        for (String pkg : packageLocations.keySet()) {
+            sb.append("  - ").append(pkg).append("\n");
+        }
+        return sb.toString();
     }
 }

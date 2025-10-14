@@ -511,12 +511,12 @@ public class Main extends javax.swing.JFrame {
 
         menuBar.add(helpMenu);
 
-        menuPackages.setMnemonic('P');
+        // AGREGAR DIRECTAMENTE AL menuBar EXISTENTE:
         menuPackages.setText("Packages");
-        menuPackages.setBorderPainted(true);
+        menuPackages.setMnemonic('P');
 
-        menuItemCompileAsPackage.setMnemonic('C');
         menuItemCompileAsPackage.setText("Compile as Package");
+        menuItemCompileAsPackage.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_P, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         menuItemCompileAsPackage.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 compileAsPackage();
@@ -524,8 +524,8 @@ public class Main extends javax.swing.JFrame {
         });
         menuPackages.add(menuItemCompileAsPackage);
 
-        menuItemLinkProgram.setMnemonic('L');
         menuItemLinkProgram.setText("Link Program");
+        menuItemLinkProgram.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         menuItemLinkProgram.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 linkProgram();
@@ -533,8 +533,8 @@ public class Main extends javax.swing.JFrame {
         });
         menuPackages.add(menuItemLinkProgram);
 
-        menuItemRunLinked.setMnemonic('R');
         menuItemRunLinked.setText("Run Linked Program");
+        menuItemRunLinked.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_R, java.awt.event.InputEvent.CTRL_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK));
         menuItemRunLinked.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 runLinkedProgram();
@@ -544,7 +544,6 @@ public class Main extends javax.swing.JFrame {
 
         menuPackages.addSeparator();
 
-        menuItemConfigurePackages.setMnemonic('P');
         menuItemConfigurePackages.setText("Configure Package Paths...");
         menuItemConfigurePackages.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -553,7 +552,7 @@ public class Main extends javax.swing.JFrame {
         });
         menuPackages.add(menuItemConfigurePackages);
 
-        menuBar.add(menuPackages);
+        menuBar.add(menuPackages);  // Agregar a menuBar
 
         setJMenuBar(menuBar);
 
@@ -874,36 +873,38 @@ public class Main extends javax.swing.JFrame {
     
     // <editor-fold defaultstate="collapsed" desc=" GUI Variables ">
     // Variables declaration - do not modify//GEN-BEGIN:variables
-    javax.swing.JMenuItem aboutMenuItem;
-    javax.swing.JButton buttonCompile;
-    javax.swing.JButton buttonCopy;
-    javax.swing.JButton buttonCut;
-    javax.swing.JButton buttonNew;
-    javax.swing.JButton buttonOpen;
-    javax.swing.JButton buttonPaste;
-    javax.swing.JButton buttonRun;
-    javax.swing.JButton buttonSave;
-    javax.swing.JMenuItem compileMenuItem;
-    javax.swing.JMenuItem copyMenuItem;
-    javax.swing.JMenuItem cutMenuItem;
-    javax.swing.JDesktopPane desktopPane;
-    javax.swing.JMenu editMenu;
-    javax.swing.JToolBar editToolBar;
-    javax.swing.JMenuItem exitMenuItem;
-    javax.swing.JMenu fileMenu;
-    javax.swing.JToolBar fileToolBar;
-    javax.swing.JMenu helpMenu;
-    javax.swing.JMenuBar menuBar;
-    javax.swing.JMenuItem newMenuItem;
-    javax.swing.JMenuItem openMenuItem;
-    javax.swing.JMenuItem pasteMenuItem;
-    javax.swing.JMenuItem runMenuItem;
-    javax.swing.JMenuItem saveAsMenuItem;
-    javax.swing.JMenuItem saveMenuItem;
-    javax.swing.JSeparator separatorExit;
-    javax.swing.JPanel toolBarsPanel;
-    javax.swing.JMenu triangleMenu;
-    javax.swing.JToolBar triangleToolBar;
+    private javax.swing.JMenuItem aboutMenuItem;
+    private javax.swing.JButton buttonCompile;
+    private javax.swing.JButton buttonCopy;
+    private javax.swing.JButton buttonCut;
+    private javax.swing.JButton buttonNew;
+    private javax.swing.JButton buttonOpen;
+    private javax.swing.JButton buttonPaste;
+    private javax.swing.JButton buttonRun;
+    private javax.swing.JButton buttonSave;
+    private javax.swing.JMenuItem compileMenuItem;
+    private javax.swing.JMenuItem copyMenuItem;
+    private javax.swing.JMenuItem cutMenuItem;
+    private javax.swing.JDesktopPane desktopPane;
+    private javax.swing.JMenu editMenu;
+    private javax.swing.JToolBar editToolBar;
+    private javax.swing.JMenuItem exitMenuItem;
+    private javax.swing.JMenu fileMenu;
+    private javax.swing.JToolBar fileToolBar;
+    private javax.swing.JMenu helpMenu;
+    private javax.swing.JMenuBar menuBar;
+    private javax.swing.JMenuItem newMenuItem;
+    private javax.swing.JMenuItem openMenuItem;
+    private javax.swing.JMenuItem pasteMenuItem;
+    private javax.swing.JMenuItem runMenuItem;
+    private javax.swing.JMenuItem saveAsMenuItem;
+    private javax.swing.JMenuItem saveMenuItem;
+    private javax.swing.JSeparator separatorExit;
+    private javax.swing.JPanel toolBarsPanel;
+    private javax.swing.JMenu triangleMenu;
+    private javax.swing.JToolBar triangleToolBar;
+    
+    // Agregar estas líneas ANTES de // End of variables declaration
     private javax.swing.JMenu menuPackages;
     private javax.swing.JMenuItem menuItemCompileAsPackage;
     private javax.swing.JMenuItem menuItemLinkProgram;
@@ -973,205 +974,277 @@ public class Main extends javax.swing.JFrame {
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc=" Package Methods ">
-    
-    /**
-     * Compila el archivo actual como paquete
-     */
-    private void compileAsPackage() {
-        FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
-        
-        if (currentFrame == null) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "No file is currently open",
-                "Compile Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Verificar si el archivo ha sido guardado
-        if (!currentFrame.getPreviouslySaved() || currentFrame.hasChanged()) {
-            saveMenuItemActionPerformed(null);
-        }
-        
-        if (!currentFrame.getPreviouslySaved()) {
-            return; // El usuario canceló el guardado
-        }
-        
-        String sourcePath = currentFrame.getTitle();
-        
-        // Seleccionar directorio de salida
-        javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
-        chooser.setDialogTitle("Select Package Output Directory");
-        chooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
-        
-        // Obtener directorio de paquetes por defecto y asegurarse de que existe
-        Triangle.PackageManager pm = Triangle.PackageManager.getInstance();
-        String packagesDir = pm.getDefaultPackageDirectory();
-        java.io.File packagesDirFile = new java.io.File(packagesDir);
-        
-        // Crear el directorio si no existe
-        if (!packagesDirFile.exists()) {
-            packagesDirFile.mkdirs();
-            System.out.println("Created default packages directory: " + packagesDir);
-        }
-        
-        chooser.setCurrentDirectory(packagesDirFile);
-        
-        if (chooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
-            String outputDir = chooser.getSelectedFile().getAbsolutePath();
-            
-            // Limpiar consola
-            currentFrame.selectConsole();
-            currentFrame.clearConsole();
-            output.setDelegate(delegateConsole);
-            
-            Triangle.IDECompiler packageCompiler = new Triangle.IDECompiler();
-            boolean success = packageCompiler.compilePackage(sourcePath, outputDir);
-            
-            if (success) {
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Package compiled successfully to:\n" + outputDir,
-                    "Compilation Successful",
-                    javax.swing.JOptionPane.INFORMATION_MESSAGE);
-                
-                // Rescan packages
-                pm.rescanAllPackages();
-            } else {
-                javax.swing.JOptionPane.showMessageDialog(this,
-                    "Package compilation failed. Check console for errors.",
-                    "Compilation Failed",
-                    javax.swing.JOptionPane.ERROR_MESSAGE);
-            }
-        }
-    }
 
-    /**
-     * Linkea el programa actual con sus dependencias
-     */
-    private void linkProgram() {
-        FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
+/**
+ * Compila el archivo actual como paquete
+ */
+private void compileAsPackage() {
+    FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
+    
+    if (currentFrame == null) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "No file is currently open",
+            "Compile Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Usar getTitle() en lugar de getFilePath()
+    String sourcePath = currentFrame.getTitle();
+    
+    // Verificar si el archivo ha sido guardado
+    if (!currentFrame.getPreviouslySaved()) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Please save the file first",
+            "Compile Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Si el archivo tiene cambios, guardarlo primero
+    if (currentFrame.hasChanged()) {
+        saveMenuItemActionPerformed(null);
+    }
+    
+    // Seleccionar directorio de salida
+    javax.swing.JFileChooser chooser = new javax.swing.JFileChooser();
+    chooser.setDialogTitle("Select Package Output Directory");
+    chooser.setFileSelectionMode(javax.swing.JFileChooser.DIRECTORIES_ONLY);
+    
+    // Obtener directorio de paquetes por defecto y asegurarse de que existe
+    Triangle.PackageManager pm = Triangle.PackageManager.getInstance();
+    String packagesDir = pm.getDefaultPackageDirectory();
+    java.io.File packagesDirFile = new java.io.File(packagesDir);
+    
+    // Crear el directorio si no existe
+    if (!packagesDirFile.exists()) {
+        packagesDirFile.mkdirs();
+        System.out.println("Created default packages directory: " + packagesDir);
+    }
+    
+    chooser.setCurrentDirectory(packagesDirFile);
+    
+    int result = chooser.showSaveDialog(this);
+    if (result == javax.swing.JFileChooser.APPROVE_OPTION) {
+        String outputDir = chooser.getSelectedFile().getAbsolutePath();
         
-        if (currentFrame == null) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "No file is currently open",
-                "Link Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+        System.out.println("=== Compiling as Package ===");
+        System.out.println("Source: " + sourcePath);
+        System.out.println("Output Dir: " + outputDir);
         
-        // Verificar si el archivo ha sido guardado
-        if (!currentFrame.getPreviouslySaved() || currentFrame.hasChanged()) {
-            saveMenuItemActionPerformed(null);
-        }
-        
-        if (!currentFrame.getPreviouslySaved()) {
-            return; // El usuario canceló el guardado
-        }
-        
-        String sourcePath = currentFrame.getTitle();
-        
-        // Primero compilar el programa
-        java.io.File sourceFile = new java.io.File(sourcePath);
-        String baseDir = sourceFile.getParent();
-        if (baseDir == null) baseDir = ".";
-        
-        String objPath = baseDir + File.separator + "obj.tam";
-        
-        // Limpiar consola
-        currentFrame.selectConsole();
+        // Limpiar consola y mostrarla
         currentFrame.clearConsole();
+        currentFrame.selectConsole();
         output.setDelegate(delegateConsole);
         
-        Triangle.IDECompiler linkCompiler = new Triangle.IDECompiler();
-        boolean compiled = linkCompiler.compileProgram(sourcePath, objPath, false, false);
+        Triangle.IDECompiler packageCompiler = new Triangle.IDECompiler();
+        boolean success = packageCompiler.compilePackage(sourcePath, outputDir);
         
-        if (!compiled) {
+        if (success) {
+            // Verificar que los archivos se crearon
+            java.io.File outDirFile = new java.io.File(outputDir);
+            String packageName = new java.io.File(sourcePath).getName().replaceAll("\\.tri$", "");
+            
+            java.io.File tamFile = new java.io.File(outDirFile, packageName + ".tam");
+            java.io.File mapFile = new java.io.File(outDirFile, packageName + ".map");
+            
+            StringBuilder message = new StringBuilder();
+            message.append("Package compiled successfully!\n\n");
+            message.append("Output directory: ").append(outputDir).append("\n\n");
+            message.append("Files generated:\n");
+            
+            if (tamFile.exists()) {
+                message.append("✓ ").append(packageName).append(".tam\n");
+            } else {
+                message.append("✗ ").append(packageName).append(".tam (MISSING!)\n");
+            }
+            
+            if (mapFile.exists()) {
+                message.append("✓ ").append(packageName).append(".map\n");
+            } else {
+                message.append("✗ ").append(packageName).append(".map (MISSING!)\n");
+            }
+            
             javax.swing.JOptionPane.showMessageDialog(this,
-                "Compilation failed. Cannot link.",
-                "Link Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Linkear
-        Triangle.IDELinker linker = new Triangle.IDELinker();
-        String linkedPath = baseDir + File.separator + "linked.tam";
-        boolean linked = linker.link(objPath, linkedPath);
-        
-        if (linked) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "Program linked successfully:\n" + linkedPath,
-                "Linking Successful",
+                message.toString(),
+                "Compilation Successful",
                 javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            
+            // Rescan packages
+            pm.rescanAllPackages();
+            
+            System.out.println("=== Compilation Complete ===");
         } else {
             javax.swing.JOptionPane.showMessageDialog(this,
-                "Linking failed. Check console for errors.",
-                "Linking Failed",
+                "Package compilation failed.\nCheck console for errors.",
+                "Compilation Failed",
                 javax.swing.JOptionPane.ERROR_MESSAGE);
+                
+            System.err.println("=== Compilation Failed ===");
         }
     }
+}
 
-    /**
-     * Ejecuta el programa linkeado
-     */
-    private void runLinkedProgram() {
-        FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
-        
-        if (currentFrame == null) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "No file is currently open",
-                "Run Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Verificar si el archivo ha sido guardado
-        if (!currentFrame.getPreviouslySaved()) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "Please save the file first",
-                "Run Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        String sourcePath = currentFrame.getTitle();
-        java.io.File sourceFile = new java.io.File(sourcePath);
-        String baseDir = sourceFile.getParent();
-        if (baseDir == null) baseDir = ".";
-        
-        String linkedPath = baseDir + File.separator + "linked.tam";
-        
-        java.io.File linkedFile = new java.io.File(linkedPath);
-        if (!linkedFile.exists()) {
-            javax.swing.JOptionPane.showMessageDialog(this,
-                "linked.tam not found. Please link the program first.",
-                "Run Error",
-                javax.swing.JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-        
-        // Limpiar y preparar consola
-        currentFrame.clearConsole();
-        currentFrame.selectConsole();
-        output.setDelegate(delegateConsole);
-        
-        // Deshabilitar botones mientras se ejecuta
-        runMenuItem.setEnabled(false);
-        buttonRun.setEnabled(false);
-        compileMenuItem.setEnabled(false);
-        buttonCompile.setEnabled(false);
-        
-        // Ejecutar usando el intérprete existente
-        interpreter.Run(linkedPath);
-    }
-
-    /**
-     * Muestra el diálogo de configuración de paquetes
-     */
-    private void configurePackages() {
-        GUI.PackageConfigDialog dialog = new GUI.PackageConfigDialog(this, true);
-        dialog.setVisible(true);
+/**
+ * Linkea el programa actual con sus dependencias
+ */
+private void linkProgram() {
+    FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
+    
+    if (currentFrame == null) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "No file is currently open",
+            "Link Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
     }
     
-    // </editor-fold>
+    // Usar getTitle() en lugar de getFilePath()
+    String sourcePath = currentFrame.getTitle();
+    
+    // Verificar si el archivo ha sido guardado
+    if (!currentFrame.getPreviouslySaved()) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Please save the file first",
+            "Link Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Si el archivo tiene cambios, guardarlo primero
+    if (currentFrame.hasChanged()) {
+        saveMenuItemActionPerformed(null);
+    }
+    
+    // Determinar directorio base
+    java.io.File sourceFile = new java.io.File(sourcePath);
+    String baseDir = sourceFile.getParent();
+    if (baseDir == null) baseDir = ".";
+    
+    String objPath = baseDir + java.io.File.separator + "obj.tam";
+    
+    System.out.println("=== Linking Program ===");
+    System.out.println("Source: " + sourcePath);
+    System.out.println("Base Dir: " + baseDir);
+    
+    // Limpiar consola y mostrarla
+    currentFrame.clearConsole();
+    currentFrame.selectConsole();
+    output.setDelegate(delegateConsole);
+    
+    // Primero compilar el programa
+    Triangle.IDECompiler linkCompiler = new Triangle.IDECompiler();
+    boolean compiled = linkCompiler.compileProgram(sourcePath, objPath, false, false);
+    
+    if (!compiled) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Compilation failed. Cannot link.\nCheck console for errors.",
+            "Link Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        System.err.println("=== Compilation Failed ===");
+        return;
+    }
+    
+    // Verificar que obj.tam se creó
+    java.io.File objFile = new java.io.File(objPath);
+    if (!objFile.exists()) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "obj.tam was not created.\nCompilation may have failed.",
+            "Link Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        System.err.println("obj.tam not found at: " + objPath);
+        return;
+    }
+    
+    System.out.println("obj.tam created successfully: " + objPath);
+    
+    // Linkear
+    Triangle.IDELinker linker = new Triangle.IDELinker();
+    String linkedPath = baseDir + java.io.File.separator + "linked.tam";
+    boolean linked = linker.link(objPath, linkedPath);
+    
+    if (linked) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Program linked successfully!\n\n" +
+            "Output: " + linkedPath,
+            "Linking Successful",
+            javax.swing.JOptionPane.INFORMATION_MESSAGE);
+        System.out.println("=== Linking Complete ===");
+    } else {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Linking failed.\nCheck console for errors.",
+            "Linking Failed",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        System.err.println("=== Linking Failed ===");
+    }
 }
+
+/**
+ * Ejecuta el programa linkeado
+ */
+private void runLinkedProgram() {
+    FileFrame currentFrame = (FileFrame)desktopPane.getSelectedFrame();
+    
+    if (currentFrame == null) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "No file is currently open",
+            "Run Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Verificar si el archivo ha sido guardado
+    if (!currentFrame.getPreviouslySaved()) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "Please save the file first",
+            "Run Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Usar getTitle() en lugar de getFilePath()
+    String sourcePath = currentFrame.getTitle();
+    java.io.File sourceFile = new java.io.File(sourcePath);
+    String baseDir = sourceFile.getParent();
+    if (baseDir == null) baseDir = ".";
+    
+    String linkedPath = baseDir + java.io.File.separator + "linked.tam";
+    
+    java.io.File linkedFile = new java.io.File(linkedPath);
+    if (!linkedFile.exists()) {
+        javax.swing.JOptionPane.showMessageDialog(this,
+            "linked.tam not found. Please link the program first.",
+            "Run Error",
+            javax.swing.JOptionPane.ERROR_MESSAGE);
+        return;
+    }
+    
+    // Limpiar y preparar consola
+    currentFrame.clearConsole();
+    currentFrame.selectConsole();
+    output.setDelegate(delegateConsole);
+    
+    // Deshabilitar botones mientras se ejecuta
+    runMenuItem.setEnabled(false);
+    buttonRun.setEnabled(false);
+    compileMenuItem.setEnabled(false);
+    buttonCompile.setEnabled(false);
+    
+    System.out.println("=== Running Linked Program ===");
+    System.out.println("Executing: " + linkedPath);
+    
+    // Ejecutar usando el intérprete existente
+    interpreter.Run(linkedPath);
+}
+
+/**
+ * Muestra el diálogo de configuración de paquetes
+ */
+private void configurePackages() {
+    GUI.PackageConfigDialog dialog = new GUI.PackageConfigDialog(this, true);
+    dialog.setVisible(true);
+}
+
+// </editor-fold>
+    
+} // Fin de la clase Main

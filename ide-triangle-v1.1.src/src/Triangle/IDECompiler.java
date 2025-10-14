@@ -1,10 +1,3 @@
-/*
- * IDE-Triangle v1.0
- * Compiler.java 
- *
- * Version para curso Compiladores 2025
- */
-
 package Triangle;
 
 import java.io.DataOutputStream;
@@ -32,6 +25,7 @@ public class IDECompiler {
     
     private boolean compilingAsPackage = false;
     private String packageName = null;
+    private String outputDirectory = null;
     
     public IDECompiler() {
     }
@@ -51,6 +45,8 @@ public class IDECompiler {
         }
         
         compilingAsPackage = true;
+        outputDirectory = outputDir;
+        
         // Extraer nombre del paquete del archivo fuente
         packageName = extractPackageName(sourceName);
         
@@ -73,6 +69,9 @@ public class IDECompiler {
                         System.err.println("Failed to rename package file");
                         return false;
                     }
+                } else {
+                    System.err.println("obj.tam not found at: " + objPath);
+                    return false;
                 }
             } catch (Exception e) {
                 System.err.println("Error renaming package file: " + e.getMessage());
@@ -81,6 +80,7 @@ public class IDECompiler {
         }
         
         compilingAsPackage = false;
+        outputDirectory = null;
         packageName = null;
         return success;
     }
@@ -110,15 +110,17 @@ public class IDECompiler {
         
         SourceFile source = new SourceFile(sourceName);
         
-        // Verificar si el archivo fuente se pudo abrir
-        if (source == null) {
+        // SourceFile constructor maneja internamente si el archivo es válido
+        // Verificamos creando el scanner
+        reporter = new IDEReporter();
+        
+        try {
+            scanner = new Scanner(source);
+            parser = new Parser(scanner, reporter);
+        } catch (Exception e) {
             System.out.println("Can't access source file " + sourceName);
             return false;
         }
-        
-        reporter = new IDEReporter();
-        scanner = new Scanner(source);
-        parser = new Parser(scanner, reporter);
         
         Program theAST = parser.parseProgram();
         
@@ -148,23 +150,31 @@ public class IDECompiler {
                     }
                     
                     // Escribir archivo objeto
-                    try (FileOutputStream objectFile = new FileOutputStream(objectName);
-                         DataOutputStream objectStream = new DataOutputStream(objectFile)) {
+                    try {
+                        FileOutputStream objectFileStream = new FileOutputStream(objectName);
+                        DataOutputStream objectStream = new DataOutputStream(objectFileStream);
                         
+                        // Guardar el programa objeto - el método correcto del Encoder
                         encoder.saveObjectProgram(objectName);
+                        objectStream.close();
                         
-                        // Generar archivos adicionales para paquetes/imports
-                        generateImportFile(objectName);
-                        generateRelocFile(objectName);
+                        System.out.println("Object file written: " + objectName);
                         
+                        // Generar archivos adicionales
                         if (compilingAsPackage && packageName != null) {
+                            // Para paquetes: generar .map en el mismo directorio que el .tam
                             generateMapFile(objectName, packageName);
+                        } else {
+                            // Para programas normales: generar .imp y .reloc
+                            generateImportFile(objectName);
+                            generateRelocFile(objectName);
                         }
                         
                         System.out.println("Compilation was successful.");
                         return true;
                     } catch (IOException e) {
                         System.out.println("Error writing object file: " + e.getMessage());
+                        e.printStackTrace();
                         return false;
                     }
                 }
@@ -181,8 +191,6 @@ public class IDECompiler {
     private void generateImportFile(String objectName) {
         if (encoder == null) return;
         
-        // Verificar si el encoder tiene el método getImports
-        // Si no existe, esta funcionalidad debe implementarse en Encoder
         try {
             File objFile = new File(objectName);
             String baseDir = objFile.getParent();
@@ -190,17 +198,22 @@ public class IDECompiler {
             
             String impFileName = baseDir + File.separator + "program.imp";
             
-            // Placeholder: Esta funcionalidad requiere modificar Encoder
-            // para rastrear los imports durante la compilación
-            java.util.List<String> imports = new java.util.ArrayList<>();
-            // imports = encoder.getImports(); // Este método debe implementarse en Encoder
+            // Verificar si el encoder tiene el método getImports
+            java.util.List<String> imports = null;
+            try {
+                java.lang.reflect.Method getImportsMethod = encoder.getClass().getMethod("getImports");
+                imports = (java.util.List<String>) getImportsMethod.invoke(encoder);
+            } catch (Exception e) {
+                System.out.println("Note: Encoder does not support getImports() - skipping import file generation");
+                return;
+            }
             
-            if (!imports.isEmpty()) {
-                try (FileWriter writer = new FileWriter(impFileName)) {
-                    for (String imp : imports) {
-                        writer.write(imp + "\n");
-                    }
+            if (imports != null && !imports.isEmpty()) {
+                FileWriter writer = new FileWriter(impFileName);
+                for (String imp : imports) {
+                    writer.write(imp + "\n");
                 }
+                writer.close();
                 System.out.println("Generated import file: " + impFileName);
             }
         } catch (IOException e) {
@@ -221,17 +234,22 @@ public class IDECompiler {
             
             String relocFileName = baseDir + File.separator + "program.reloc";
             
-            // Placeholder: Esta funcionalidad requiere modificar Encoder
-            // para rastrear las relocalizaciones durante la compilación
-            java.util.List<String> relocations = new java.util.ArrayList<>();
-            // relocations = encoder.getRelocations(); // Este método debe implementarse en Encoder
+            // Verificar si el encoder tiene el método getRelocations
+            java.util.List<String> relocations = null;
+            try {
+                java.lang.reflect.Method getRelocationsMethod = encoder.getClass().getMethod("getRelocations");
+                relocations = (java.util.List<String>) getRelocationsMethod.invoke(encoder);
+            } catch (Exception e) {
+                System.out.println("Note: Encoder does not support getRelocations() - skipping reloc file generation");
+                return;
+            }
             
-            if (!relocations.isEmpty()) {
-                try (FileWriter writer = new FileWriter(relocFileName)) {
-                    for (String reloc : relocations) {
-                        writer.write(reloc + "\n");
-                    }
+            if (relocations != null && !relocations.isEmpty()) {
+                FileWriter writer = new FileWriter(relocFileName);
+                for (String reloc : relocations) {
+                    writer.write(reloc + "\n");
                 }
+                writer.close();
                 System.out.println("Generated relocation file: " + relocFileName);
             }
         } catch (IOException e) {
@@ -241,33 +259,46 @@ public class IDECompiler {
     
     /**
      * Genera archivo .map con exports del paquete
+     * IMPORTANTE: Se genera en el mismo directorio que el .tam del paquete
      */
     private void generateMapFile(String objectName, String packageName) {
         if (encoder == null) return;
         
         try {
-            File objFile = new File(objectName);
-            String baseDir = objFile.getParent();
-            if (baseDir == null) baseDir = ".";
+            // Usar outputDirectory si está disponible, sino usar el directorio del objectName
+            String baseDir = outputDirectory;
+            if (baseDir == null) {
+                File objFile = new File(objectName);
+                baseDir = objFile.getParent();
+                if (baseDir == null) baseDir = ".";
+            }
             
             String mapFileName = baseDir + File.separator + packageName + ".map";
             
-            // Placeholder: Esta funcionalidad requiere modificar Encoder
-            // para rastrear los exports durante la compilación
-            java.util.Map<String, Integer> exports = new java.util.HashMap<>();
-            // exports = encoder.getExports(); // Este método debe implementarse en Encoder
+            // Verificar si el encoder tiene el método getExports
+            java.util.Map<String, Integer> exports = null;
+            try {
+                java.lang.reflect.Method getExportsMethod = encoder.getClass().getMethod("getExports");
+                exports = (java.util.Map<String, Integer>) getExportsMethod.invoke(encoder);
+            } catch (Exception e) {
+                System.out.println("Note: Encoder does not support getExports() - skipping map file generation");
+                return;
+            }
             
-            if (!exports.isEmpty()) {
-                try (FileWriter writer = new FileWriter(mapFileName)) {
-                    for (java.util.Map.Entry<String, Integer> entry : exports.entrySet()) {
-                        writer.write("export " + packageName + "." + entry.getKey() + 
-                                    " " + entry.getValue() + "\n");
-                    }
+            if (exports != null && !exports.isEmpty()) {
+                FileWriter writer = new FileWriter(mapFileName);
+                for (java.util.Map.Entry<String, Integer> entry : exports.entrySet()) {
+                    writer.write("export " + packageName + "." + entry.getKey() + 
+                                " " + entry.getValue() + "\n");
                 }
+                writer.close();
                 System.out.println("Generated map file: " + mapFileName);
+            } else {
+                System.out.println("Warning: No exports found for package " + packageName);
             }
         } catch (IOException e) {
             System.err.println("Error generating map file: " + e.getMessage());
+            e.printStackTrace();
         }
     }
     
