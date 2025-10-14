@@ -33,6 +33,7 @@ import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
 import Triangle.AbstractSyntaxTrees.Identifier;
 import Triangle.AbstractSyntaxTrees.IfCommand;
 import Triangle.AbstractSyntaxTrees.IfExpression;
+import Triangle.AbstractSyntaxTrees.ImportDeclaration;
 import Triangle.AbstractSyntaxTrees.IntTypeDenoter;
 import Triangle.AbstractSyntaxTrees.IntegerExpression;
 import Triangle.AbstractSyntaxTrees.IntegerLiteral;
@@ -208,6 +209,10 @@ public class TreeVisitor implements Visitor {
         return(createUnary("Export Declaration", ast.I));
     }
     // </editor-fold>
+    
+    public Object visitImportDeclaration(ImportDeclaration ast, Object obj) {
+        return(createNullary("Import Declaration"));
+    }
     
     // <editor-fold defaultstate="collapsed" desc=" Aggregates ">
     // Array Aggregates

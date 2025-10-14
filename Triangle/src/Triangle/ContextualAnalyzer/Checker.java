@@ -15,14 +15,12 @@
 package Triangle.ContextualAnalyzer;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
                                                                                             
 import java.util.*;
 
 import Triangle.ErrorReporter;
 import Triangle.StdEnvironment;
 import Triangle.AbstractSyntaxTrees.*;
-import Triangle.SyntacticAnalyzer.SourcePosition;
 import Triangle.ContextualAnalyzer.PackageLoader;
 import Triangle.ContextualAnalyzer.PackageLoader.PackageArtifact;
 import Triangle.ContextualAnalyzer.PackageLoader.ExportEntry;
