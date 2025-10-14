@@ -211,7 +211,7 @@ public class TreeVisitor implements Visitor {
     // </editor-fold>
     
     public Object visitImportDeclaration(ImportDeclaration ast, Object obj) {
-        return(createNullary("Import Declaration"));
+        return(createUnary("Import Package Declaration", ast.packageId));
     }
     
     // <editor-fold defaultstate="collapsed" desc=" Aggregates ">

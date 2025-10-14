@@ -4,8 +4,8 @@ import Triangle.SyntacticAnalyzer.SourcePosition;
 
 public class ImportDeclaration extends Declaration {
   // Paquete a importar, p.ej. Utils
-  public final Identifier packageId;
-
+  public Identifier packageId;
+  
   // Nombres específicos si venía "from P import a, b"; null si era "import P"
   public final Identifier[] names;
 
