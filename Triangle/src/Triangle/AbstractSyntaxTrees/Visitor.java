@@ -15,6 +15,10 @@
 package Triangle.AbstractSyntaxTrees;
 
 public interface Visitor {
+    
+  //Para proyecto paquetes
+  public abstract Object visitImportDeclaration(ImportDeclaration ast, Object o);
+
 
   // Commands
   public abstract Object visitAssignCommand(AssignCommand ast, Object o);

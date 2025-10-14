@@ -33,6 +33,7 @@ import Triangle.AbstractSyntaxTrees.FuncFormalParameter;
 import Triangle.AbstractSyntaxTrees.Identifier;
 import Triangle.AbstractSyntaxTrees.IfCommand;
 import Triangle.AbstractSyntaxTrees.IfExpression;
+import Triangle.AbstractSyntaxTrees.ImportDeclaration;
 import Triangle.AbstractSyntaxTrees.IntTypeDenoter;
 import Triangle.AbstractSyntaxTrees.IntegerExpression;
 import Triangle.AbstractSyntaxTrees.IntegerLiteral;
@@ -320,6 +321,11 @@ public class TableVisitor implements Visitor {
   
   public Object visitExportDeclaration(ExportDeclaration ast, Object o) {
       ast.I.visit(this, o);
+      return(null);
+  }
+  
+  public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+      
       return(null);
   }
   

@@ -1,0 +1,3 @@
+reloc Utils.min 3
+reloc Utils.max 8
+reloc MathEx.square 12

@@ -82,6 +82,7 @@ import Triangle.AbstractSyntaxTrees.VarFormalParameter;
 import Triangle.AbstractSyntaxTrees.Visitor;
 import Triangle.AbstractSyntaxTrees.VnameExpression;
 import Triangle.AbstractSyntaxTrees.WhileCommand;
+import Triangle.AbstractSyntaxTrees.ImportDeclaration;
 
 public class LayoutVisitor implements Visitor {
 
@@ -93,6 +94,12 @@ public class LayoutVisitor implements Visitor {
   public LayoutVisitor (FontMetrics fontMetrics) {
     this.fontMetrics = fontMetrics;
   }
+  
+  @Override
+    public Object visitImportDeclaration(ImportDeclaration ast, Object o) {
+        return null;
+    }
+
 
   // Commands
   public Object visitAssignCommand(AssignCommand ast, Object obj) {

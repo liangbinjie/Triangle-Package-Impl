@@ -1,0 +1,9 @@
+let
+  from Utils import min, max;
+  proc main() ~
+    begin
+      putint(max(5, 9)); puteol();
+      putint(max(5, 9)); puteol()
+    end
+in
+  main()
