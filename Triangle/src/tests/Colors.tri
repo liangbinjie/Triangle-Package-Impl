@@ -1,0 +1,14 @@
+package Colors ~
+  type Color ~ record
+          r: Integer,
+          g: Integer,
+          b: Integer
+        end;
+        
+  const red ~ {r ~ 255, g ~ 0, b ~ 0};
+proc putcolor(c: Color) ~
+	begin
+	putint(c.g)
+	end;
+export Color, red, putcolor
+end

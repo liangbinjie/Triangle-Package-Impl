@@ -1,11 +1,8 @@
+! main
 let
-  from Utils import min, max;
-  from MathEx import square;
-  proc main() ~
-    begin
-      putint(min(5, 9)); puteol();   ! -> 5
-      putint(max(5, 9)); puteol();   ! -> 9
-      putint(square(7)); puteol()    ! -> 49
-    end
+from Colors import red, Color;
+var c: Color
 in
-  main()
+begin
+c := red
+end

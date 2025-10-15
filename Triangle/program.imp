@@ -1,3 +1,2 @@
-import Utils.min
-import Utils.max
-import MathEx.square
+import Colors.red
+import Colors.Color

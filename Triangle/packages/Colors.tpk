@@ -1,0 +1,4 @@
+package Colors
+export type Color record(r:Integer,g:Integer,b:Integer)
+export const red :record(r:Integer,g:Integer,b:Integer)
+export proc putcolor proc(record(r:Integer,g:Integer,b:Integer))
