@@ -139,6 +139,10 @@ public class IDECompiler {
             if (reporter.numErrors == 0) {
                 System.out.println("Code Generation ...");
                 encoder = new Encoder(reporter);
+                
+                // Establecer el nombre del paquete en el encoder
+                encoder.setPackageName(packageName);
+                
                 encoder.encodeRun(theAST, showingTable);
                 
                 if (reporter.numErrors == 0) {

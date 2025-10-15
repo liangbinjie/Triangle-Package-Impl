@@ -25,6 +25,7 @@ public class OutputRedirector extends ByteArrayOutputStream {
      */
     public OutputRedirector() {
         System.setOut(new PrintStream(this));
+        delegate = null; // AGREGADO: Inicializar explícitamente
     }
           
     /**
@@ -35,7 +36,14 @@ public class OutputRedirector extends ByteArrayOutputStream {
     public void write(byte b[]) throws IOException { 
         String a = new String(b);
         dataQueue.add(a);
-        delegate.actionPerformed(null);
+        
+        // AGREGADO: Verificar que delegate no sea null
+        if (delegate != null) {
+            delegate.actionPerformed(null);
+        } else {
+            // Fallback: imprimir a stderr si no hay delegate configurado
+            System.err.print(a);
+        }
     }
        
     /**
@@ -47,7 +55,14 @@ public class OutputRedirector extends ByteArrayOutputStream {
     public void write(byte b[], int offset, int length) {
         String a = new String(b, offset, length);
         dataQueue.add(a);
-        delegate.actionPerformed(null);
+        
+        // AGREGADO: Verificar que delegate no sea null
+        if (delegate != null) {
+            delegate.actionPerformed(null);
+        } else {
+            // Fallback: imprimir a stderr si no hay delegate configurado
+            System.err.print(a);
+        }
     }    
         
     /**
