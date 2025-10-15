@@ -923,36 +923,19 @@ public final class Encoder implements Visitor {
         
         tableDetailsReqd = tableDetails;
 
-        currentPackageName = null;
-        exportedDecls.clear();
-        exportLines.clear();
-        importLines.clear();
-        relocLines.clear();
-        importedNames.clear();
-        importedByName.clear();
+        // Resetear estado de paquetes
+        // NO resetear currentPackageName aquí, lo establece visitPackageCommand
 
         theAST.visit(this, new Frame(0, 0));
         emit(Machine.HALTop, 0, 0, 0);
 
-        System.out.println("[Encoder] relocLines size = " + relocLines.size()
-                + " | imports=" + importLines.size()
-                + " | currentPackageName=" + currentPackageName);
-
-        if (currentPackageName != null) {
-            if (!exportLines.isEmpty())
-                writeLinesToFile(currentPackageName + ".map", exportLines);
-        } else {
-            if (!importLines.isEmpty())
-                writeLinesToFile("program.imp", importLines);
-            if (!relocLines.isEmpty())
-                writeLinesToFile("program.reloc", relocLines);
-        }
-
-        System.out.println("[Encoder] Compilation complete:");
+        System.out.println("[Encoder] Code generation complete");
         System.out.println("  Imports: " + imports.size());
-        System.out.println("  Relocations: " + relocations.size());
+        System.out.println("  Relocations: " + relocLines.size());
         System.out.println("  Exports: " + exports.size());
         System.out.println("  Package name: " + currentPackageName);
+        
+        // NO escribir archivos aquí, eso lo hace IDECompiler
     }
 
     private final void elaborateStdConst(Declaration constDeclaration, int value) {
@@ -1208,6 +1191,14 @@ public final class Encoder implements Visitor {
         imports.clear();
         relocations.clear();
         exports.clear();
+    }
+
+    /**
+     * Obtiene el nombre del paquete actual
+     * @return Nombre del paquete o null si no es un paquete
+     */
+    public String getCurrentPackageName() {
+        return currentPackageName;
     }
 
     // ===== FIN MÉTODOS PÚBLICOS =====

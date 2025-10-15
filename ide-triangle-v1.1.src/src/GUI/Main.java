@@ -1122,6 +1122,9 @@ private void linkProgram() {
     if (baseDir == null) baseDir = ".";
     
     String objPath = baseDir + java.io.File.separator + "obj.tam";
+    String importPath = baseDir + java.io.File.separator + "program.imp";
+    String relocPath = baseDir + java.io.File.separator + "program.reloc";
+    String linkedPath = baseDir + java.io.File.separator + "linked.tam";
     
     System.out.println("=== Linking Program ===");
     System.out.println("Source: " + sourcePath);
@@ -1158,10 +1161,17 @@ private void linkProgram() {
     
     System.out.println("obj.tam created successfully: " + objPath);
     
-    // Linkear
+    // Linkear - CORRECCIÓN: Pasar los 4 parámetros requeridos
     Triangle.IDELinker linker = new Triangle.IDELinker();
-    String linkedPath = baseDir + java.io.File.separator + "linked.tam";
-    boolean linked = linker.link(objPath, linkedPath);
+    
+    // Agregar ruta de paquetes al linker
+    Triangle.PackageManager pm = Triangle.PackageManager.getInstance();
+    for (String path : pm.getPackagePaths()) {
+        linker.addPackagePath(path);
+    }
+    
+    // CORRECCIÓN: Llamar con los 4 parámetros: objectFile, importFile, relocFile, outputFile
+    boolean linked = linker.link(objPath, importPath, relocPath, linkedPath);
     
     if (linked) {
         javax.swing.JOptionPane.showMessageDialog(this,

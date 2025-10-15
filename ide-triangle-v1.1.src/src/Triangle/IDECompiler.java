@@ -1,10 +1,5 @@
 package Triangle;
 
-import java.io.DataOutputStream;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.File;
 import Triangle.AbstractSyntaxTrees.Program;
 import Triangle.CodeGenerator.Encoder;
 import Triangle.ContextualAnalyzer.Checker;
@@ -12,301 +7,231 @@ import Triangle.SyntacticAnalyzer.Parser;
 import Triangle.SyntacticAnalyzer.Scanner;
 import Triangle.SyntacticAnalyzer.SourceFile;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+
+/**
+ * Triangle compiler driver for IDE integration
+ */
 public class IDECompiler {
-    private String objectName = "obj.tam";
-    private boolean showingAST = false;
-    private boolean showingTable = false;
-    
-    private ErrorReporter reporter;
-    private Scanner scanner;
-    private Parser parser;
-    private Checker checker;
+
+    private IDEReporter reporter;
     private Encoder encoder;
-    
-    private boolean compilingAsPackage = false;
-    private String packageName = null;
-    private String outputDirectory = null;
-    
+    private String packageName;
+
     public IDECompiler() {
+        reporter = new IDEReporter();
+        encoder = null;
+        packageName = null;
     }
-    
+
     /**
-     * Compila un archivo fuente como paquete
+     * Compile a Triangle program
+     * @param sourceName source file path
+     * @param objectName object file path (obj.tam)
+     * @param showingAST show AST
+     * @param showingTable show table
+     * @return true if successful
+     */
+    public boolean compileProgram(String sourceName, String objectName, 
+                                   boolean showingAST, boolean showingTable) {
+        
+        System.out.println("********** Triangle Compiler (IDE Version) **********");
+        
+        // 1. Análisis sintáctico
+        System.out.println("Syntactic Analysis ...");
+        SourceFile source = new SourceFile(sourceName);
+        
+        // CORRECCIÓN: Verificar si el archivo existe usando File en lugar de getSource()
+        File sourceFile = new File(sourceName);
+        if (!sourceFile.exists()) {
+            System.err.println("Can't access source file " + sourceName);
+            return false;
+        }
+        
+        Scanner scanner = new Scanner(source);
+        
+        // CORRECCIÓN: Crear nuevo reporter en lugar de reset()
+        reporter = new IDEReporter();
+        
+        Parser parser = new Parser(scanner, reporter);
+        Program theAST = parser.parseProgram();
+        
+        if (reporter.numErrors > 0) {
+            System.err.println("Compilation failed with " + reporter.numErrors + " syntactic errors");
+            return false;
+        }
+        
+        // 2. Análisis contextual
+        System.out.println("Contextual Analysis ...");
+        Checker checker = new Checker(reporter);
+        checker.check(theAST);
+        
+        if (reporter.numErrors > 0) {
+            System.err.println("Compilation failed with " + reporter.numErrors + " contextual errors");
+            return false;
+        }
+        
+        // 3. Generación de código
+        System.out.println("Code Generation ...");
+        encoder = new Encoder(reporter);
+        encoder.encodeRun(theAST, showingTable);
+        
+        if (reporter.numErrors > 0) {
+            System.err.println("Compilation failed with " + reporter.numErrors + " code generation errors");
+            return false;
+        }
+        
+        // 4. Guardar código objeto
+        encoder.saveObjectProgram(objectName);
+        System.out.println("Object file written: " + objectName);
+        
+        // 5. Generar archivos de imports y relocalizaciones
+        String baseDir = new File(objectName).getParent();
+        if (baseDir == null) baseDir = ".";
+        
+        // Generar program.imp si hay imports
+        if (!encoder.getImports().isEmpty()) {
+            String importFile = baseDir + File.separator + "program.imp";
+            if (writeLinesToFile(importFile, encoder.getImports())) {
+                System.out.println("Generated import file: " + importFile);
+            }
+        }
+        
+        // Generar program.reloc si hay relocalizaciones
+        if (!encoder.getRelocations().isEmpty()) {
+            String relocFile = baseDir + File.separator + "program.reloc";
+            if (writeLinesToFile(relocFile, encoder.getRelocations())) {
+                System.out.println("Generated relocation file: " + relocFile);
+            }
+        }
+        
+        System.out.println("Compilation was successful.");
+        return true;
+    }
+
+    /**
+     * Compile a Triangle package
+     * @param sourceName source file path
+     * @param outputDir output directory for package files
+     * @return true if successful
      */
     public boolean compilePackage(String sourceName, String outputDir) {
-        // Asegurar que el directorio de salida existe
+        
+        System.out.println("********** Triangle Compiler (IDE Version) **********");
+        
+        // Crear directorio de salida si no existe
         File outDir = new File(outputDir);
         if (!outDir.exists()) {
             if (!outDir.mkdirs()) {
                 System.err.println("Failed to create output directory: " + outputDir);
                 return false;
             }
-            System.out.println("Created output directory: " + outputDir);
+            System.out.println("Created package directory: " + outputDir);
         }
         
-        compilingAsPackage = true;
-        outputDirectory = outputDir;
-        
-        // Extraer nombre del paquete del archivo fuente
-        packageName = extractPackageName(sourceName);
-        
-        String objPath = outputDir + File.separator + "obj.tam";
-        boolean success = compileProgram(sourceName, objPath, false, false);
-        
-        if (success && packageName != null) {
-            // Renombrar obj.tam a PackageName.tam
-            try {
-                File objFile = new File(objPath);
-                File packageFile = new File(outputDir + File.separator + packageName + ".tam");
-                
-                if (objFile.exists()) {
-                    if (packageFile.exists()) {
-                        packageFile.delete();
-                    }
-                    if (objFile.renameTo(packageFile)) {
-                        System.out.println("Package file created: " + packageFile.getAbsolutePath());
-                    } else {
-                        System.err.println("Failed to rename package file");
-                        return false;
-                    }
-                } else {
-                    System.err.println("obj.tam not found at: " + objPath);
-                    return false;
-                }
-            } catch (Exception e) {
-                System.err.println("Error renaming package file: " + e.getMessage());
-                return false;
-            }
-        }
-        
-        compilingAsPackage = false;
-        outputDirectory = null;
-        packageName = null;
-        return success;
-    }
-    
-    /**
-     * Extrae el nombre del paquete del archivo fuente
-     */
-    private String extractPackageName(String sourceName) {
-        File file = new File(sourceName);
-        String name = file.getName();
-        int dotIndex = name.lastIndexOf('.');
-        if (dotIndex > 0) {
-            return name.substring(0, dotIndex);
-        }
-        return name;
-    }
-    
-    public boolean compileProgram(String sourceName, String objectName,
-            boolean showingAST, boolean showingTable) {
-        
-        this.objectName = objectName;
-        this.showingAST = showingAST;
-        this.showingTable = showingTable;
-        
-        System.out.println("********** Triangle Compiler (IDE Version) **********");
+        // 1. Análisis sintáctico
         System.out.println("Syntactic Analysis ...");
-        
         SourceFile source = new SourceFile(sourceName);
         
-        // SourceFile constructor maneja internamente si el archivo es válido
-        // Verificamos creando el scanner
-        reporter = new IDEReporter();
-        
-        try {
-            scanner = new Scanner(source);
-            parser = new Parser(scanner, reporter);
-        } catch (Exception e) {
-            System.out.println("Can't access source file " + sourceName);
+        // CORRECCIÓN: Verificar si el archivo existe usando File en lugar de getSource()
+        File sourceFile = new File(sourceName);
+        if (!sourceFile.exists()) {
+            System.err.println("Can't access source file " + sourceName);
             return false;
         }
         
+        Scanner scanner = new Scanner(source);
+        
+        // CORRECCIÓN: Crear nuevo reporter en lugar de reset()
+        reporter = new IDEReporter();
+        
+        Parser parser = new Parser(scanner, reporter);
         Program theAST = parser.parseProgram();
         
-        if (reporter.numErrors == 0) {
-            System.out.println("Contextual Analysis ...");
-            checker = new Checker(reporter);
-            checker.check(theAST);
+        if (reporter.numErrors > 0) {
+            System.err.println("Package compilation failed with " + reporter.numErrors + " syntactic errors");
+            return false;
+        }
+        
+        // 2. Análisis contextual
+        System.out.println("Contextual Analysis ...");
+        Checker checker = new Checker(reporter);
+        checker.check(theAST);
+        
+        if (reporter.numErrors > 0) {
+            System.err.println("Package compilation failed with " + reporter.numErrors + " contextual errors");
+            return false;
+        }
+        
+        // 3. Generación de código
+        System.out.println("Code Generation ...");
+        encoder = new Encoder(reporter);
+        encoder.encodeRun(theAST, false);
+        
+        if (reporter.numErrors > 0) {
+            System.err.println("Package compilation failed with " + reporter.numErrors + " code generation errors");
+            return false;
+        }
+        
+        // 4. Obtener nombre del paquete desde el encoder
+        packageName = encoder.getCurrentPackageName();
+        
+        if (packageName == null) {
+            System.err.println("ERROR: No package declaration found in source file");
+            return false;
+        }
+        
+        // 5. Guardar archivo TAM del paquete
+        String tamFile = outputDir + File.separator + packageName + ".tam";
+        encoder.saveObjectProgram(tamFile);
+        System.out.println("Object file written: " + tamFile);
+        
+        // 6. Generar archivo .map con los exports
+        if (!encoder.getExports().isEmpty()) {
+            String mapFile = outputDir + File.separator + packageName + ".map";
             
-            if (showingAST) {
-                // Mostrar AST si se requiere
-            }
-            if (showingTable) {
-                // Mostrar tabla si se requiere
+            java.util.List<String> exportLines = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, Integer> entry : encoder.getExports().entrySet()) {
+                String qname = packageName + "." + entry.getKey();
+                exportLines.add("export " + qname + " " + entry.getValue());
             }
             
-            if (reporter.numErrors == 0) {
-                System.out.println("Code Generation ...");
-                encoder = new Encoder(reporter);
-                
-                // Establecer el nombre del paquete en el encoder
-                encoder.setPackageName(packageName);
-                
-                encoder.encodeRun(theAST, showingTable);
-                
-                if (reporter.numErrors == 0) {
-                    // Asegurar que el directorio de salida existe
-                    File objFile = new File(objectName);
-                    File parentDir = objFile.getParentFile();
-                    if (parentDir != null && !parentDir.exists()) {
-                        parentDir.mkdirs();
-                    }
-                    
-                    // Escribir archivo objeto
-                    try {
-                        FileOutputStream objectFileStream = new FileOutputStream(objectName);
-                        DataOutputStream objectStream = new DataOutputStream(objectFileStream);
-                        
-                        // Guardar el programa objeto - el método correcto del Encoder
-                        encoder.saveObjectProgram(objectName);
-                        objectStream.close();
-                        
-                        System.out.println("Object file written: " + objectName);
-                        
-                        // Generar archivos adicionales
-                        if (compilingAsPackage && packageName != null) {
-                            // Para paquetes: generar .map en el mismo directorio que el .tam
-                            generateMapFile(objectName, packageName);
-                        } else {
-                            // Para programas normales: generar .imp y .reloc
-                            generateImportFile(objectName);
-                            generateRelocFile(objectName);
-                        }
-                        
-                        System.out.println("Compilation was successful.");
-                        return true;
-                    } catch (IOException e) {
-                        System.out.println("Error writing object file: " + e.getMessage());
-                        e.printStackTrace();
-                        return false;
-                    }
-                }
+            if (writeLinesToFile(mapFile, exportLines)) {
+                System.out.println("Generated map file: " + mapFile);
             }
         }
         
-        System.out.println("Compilation was unsuccessful.");
-        return false;
+        System.out.println("Compilation was successful.");
+        System.out.println("Package file created: " + tamFile);
+        
+        return true;
     }
-    
+
     /**
-     * Genera archivo .imp con imports del programa
+     * Get package name after compilation
      */
-    private void generateImportFile(String objectName) {
-        if (encoder == null) return;
-        
-        try {
-            File objFile = new File(objectName);
-            String baseDir = objFile.getParent();
-            if (baseDir == null) baseDir = ".";
-            
-            String impFileName = baseDir + File.separator + "program.imp";
-            
-            // Verificar si el encoder tiene el método getImports
-            java.util.List<String> imports = null;
-            try {
-                java.lang.reflect.Method getImportsMethod = encoder.getClass().getMethod("getImports");
-                imports = (java.util.List<String>) getImportsMethod.invoke(encoder);
-            } catch (Exception e) {
-                System.out.println("Note: Encoder does not support getImports() - skipping import file generation");
-                return;
-            }
-            
-            if (imports != null && !imports.isEmpty()) {
-                FileWriter writer = new FileWriter(impFileName);
-                for (String imp : imports) {
-                    writer.write(imp + "\n");
-                }
-                writer.close();
-                System.out.println("Generated import file: " + impFileName);
-            }
-        } catch (IOException e) {
-            System.err.println("Error generating import file: " + e.getMessage());
-        }
+    public String getPackageName() {
+        return packageName;
     }
-    
+
     /**
-     * Genera archivo .reloc con información de reubicación
+     * Write lines to a file
      */
-    private void generateRelocFile(String objectName) {
-        if (encoder == null) return;
-        
+    private boolean writeLinesToFile(String filepath, java.util.List<String> lines) {
         try {
-            File objFile = new File(objectName);
-            String baseDir = objFile.getParent();
-            if (baseDir == null) baseDir = ".";
-            
-            String relocFileName = baseDir + File.separator + "program.reloc";
-            
-            // Verificar si el encoder tiene el método getRelocations
-            java.util.List<String> relocations = null;
-            try {
-                java.lang.reflect.Method getRelocationsMethod = encoder.getClass().getMethod("getRelocations");
-                relocations = (java.util.List<String>) getRelocationsMethod.invoke(encoder);
-            } catch (Exception e) {
-                System.out.println("Note: Encoder does not support getRelocations() - skipping reloc file generation");
-                return;
+            BufferedWriter writer = new BufferedWriter(new FileWriter(filepath));
+            for (String line : lines) {
+                writer.write(line);
+                writer.newLine();
             }
-            
-            if (relocations != null && !relocations.isEmpty()) {
-                FileWriter writer = new FileWriter(relocFileName);
-                for (String reloc : relocations) {
-                    writer.write(reloc + "\n");
-                }
-                writer.close();
-                System.out.println("Generated relocation file: " + relocFileName);
-            }
+            writer.close();
+            return true;
         } catch (IOException e) {
-            System.err.println("Error generating relocation file: " + e.getMessage());
+            System.err.println("Error writing file " + filepath + ": " + e.getMessage());
+            return false;
         }
-    }
-    
-    /**
-     * Genera archivo .map con exports del paquete
-     * IMPORTANTE: Se genera en el mismo directorio que el .tam del paquete
-     */
-    private void generateMapFile(String objectName, String packageName) {
-        if (encoder == null) return;
-        
-        try {
-            // Usar outputDirectory si está disponible, sino usar el directorio del objectName
-            String baseDir = outputDirectory;
-            if (baseDir == null) {
-                File objFile = new File(objectName);
-                baseDir = objFile.getParent();
-                if (baseDir == null) baseDir = ".";
-            }
-            
-            String mapFileName = baseDir + File.separator + packageName + ".map";
-            
-            // Verificar si el encoder tiene el método getExports
-            java.util.Map<String, Integer> exports = null;
-            try {
-                java.lang.reflect.Method getExportsMethod = encoder.getClass().getMethod("getExports");
-                exports = (java.util.Map<String, Integer>) getExportsMethod.invoke(encoder);
-            } catch (Exception e) {
-                System.out.println("Note: Encoder does not support getExports() - skipping map file generation");
-                return;
-            }
-            
-            if (exports != null && !exports.isEmpty()) {
-                FileWriter writer = new FileWriter(mapFileName);
-                for (java.util.Map.Entry<String, Integer> entry : exports.entrySet()) {
-                    writer.write("export " + packageName + "." + entry.getKey() + 
-                                " " + entry.getValue() + "\n");
-                }
-                writer.close();
-                System.out.println("Generated map file: " + mapFileName);
-            } else {
-                System.out.println("Warning: No exports found for package " + packageName);
-            }
-        } catch (IOException e) {
-            System.err.println("Error generating map file: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-    
-    public ErrorReporter getErrorReporter() {
-        return reporter;
     }
 }
