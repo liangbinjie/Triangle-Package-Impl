@@ -17,6 +17,7 @@
 
 package Triangle;
 
+import Triangle.LLVMCodeGenerator.LLVMGenerator; // Cambio aquí
 import Triangle.AbstractSyntaxTrees.Program;
 import Triangle.CodeGenerator.Encoder;
 import Triangle.ContextualAnalyzer.Checker;
@@ -40,6 +41,7 @@ public class Compiler {
     private static Parser parser;
     private static Checker checker;
     private static Encoder encoder;
+    private static LLVMGenerator llvmGenerator; // Variable para LLVM
     private static ErrorReporter reporter;
     private static Drawer drawer;
 
@@ -62,14 +64,11 @@ public class Compiler {
      *          otherwise false.
      */
     static boolean compileProgram (String sourceName, String objectName,
-                                   boolean showingAST, boolean showingTable) {
+                                   boolean showingAST, boolean showingTable,
+                                   boolean generateLLVM) {
 
-        System.out.println("********** " +
-                           "Triangle Compiler (Java Version 2.1)" +
-                           " Hola Mundo! " +
-                           " **********");
+        System.out.println("********** Triangle Compiler (LLVM Mode: " + generateLLVM + ") **********");
 
-        System.out.println("Syntactic Analysis ...");
         SourceFile source = new SourceFile(sourceName);
 
         if (source == null) {
@@ -81,30 +80,49 @@ public class Compiler {
         reporter = new ErrorReporter();
         parser   = new Parser(scanner, reporter);
         checker  = new Checker(reporter);
-        encoder  = new Encoder(reporter);
-        drawer   = new Drawer();
 
-        // scanner.enableDebugging();
+        // Inicializar encoder (TAM) o llvmGenerator según el modo
+        if (generateLLVM) {
+            llvmGenerator = new LLVMGenerator();
+        } else {
+            encoder = new Encoder(reporter);
+        }
+
+        // Compilar
+        System.out.println("Syntactic Analysis ...");
         theAST = parser.parseProgram();				// 1st pass
+
         if (reporter.numErrors == 0) {
-            //if (showingAST) {
-            //    drawer.draw(theAST);
-            //}
-            System.out.println ("Contextual Analysis ...");
+            System.out.println("Contextual Analysis ...");
             checker.check(theAST);				// 2nd pass
             if (showingAST) {
                 drawer.draw(theAST);
             }
             if (reporter.numErrors == 0) {
-                System.out.println("Code Generation ...");
-                encoder.encodeRun(theAST, showingTable);	// 3rd pass
+                if (generateLLVM) {
+                    System.out.println("LLVM Code Generation ...");
+                    llvmGenerator.generateRun(theAST, sourceName);
+                } else {
+                    System.out.println("TAM Code Generation ...");
+                    encoder.encodeRun(theAST, showingTable);	// 3rd pass
+                }
             }
         }
 
 	boolean successful = (reporter.numErrors == 0);
+        
         if (successful) {
-            encoder.saveObjectProgram(objectName);
-            System.out.println("Compilation was successful.");
+            if (generateLLVM) {
+                System.out.println("LLVM compilation was successful.");
+            } else {
+                try {
+                    encoder.saveObjectProgram(objectName);
+                    System.out.println("TAM compilation was successful.");
+                } catch (Exception e) {
+                    System.out.println("Error saving object file: " + e.getMessage());
+                    successful = false;
+                }
+            }
         } else {
             System.out.println("Compilation was unsuccessful.");
         }
@@ -118,14 +136,31 @@ public class Compiler {
      *                  the source filename.
      */
     public static void main(String[] args) {
-        boolean compiledOK;
+        boolean compilingOK;
+        boolean showingAST = false;
+        boolean showingTable = false;
+        boolean generateLLVM = false;
 
-        if (args.length != 1) {
-            System.out.println("Usage: tc filename");
-            System.exit(1);
+        String sourceName = "test.tri";
+        String objectName = "test.tam";
+
+        // Procesar argumentos
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("-llvm")) {
+                generateLLVM = true;
+            } else if (args[i].equals("-ast")) {
+                showingAST = true;
+            } else if (args[i].equals("-table")) {
+                showingTable = true;
+            } else if (i == args.length - 1) {
+                sourceName = args[i];
+                objectName = sourceName.replace(".tri", ".tam");
+            }
         }
 
-        String sourceName = args[0];
-        compiledOK = compileProgram(sourceName, objectName, false, false);
+        compilingOK = compileProgram(sourceName, objectName, 
+                                      showingAST, showingTable, generateLLVM);
+
+        System.exit(compilingOK ? 0 : 1);
     }
 }

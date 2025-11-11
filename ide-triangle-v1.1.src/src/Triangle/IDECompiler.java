@@ -1,102 +1,165 @@
 /*
- * IDE-Triangle v1.0
- * Compiler.java 
- *
- * Version para curso Compiladores 2025
+ * IDECompiler.java
+ * 
+ * Extended to support LLVM code generation
  */
 
 package Triangle;
 
-import Triangle.CodeGenerator.Frame;
-import java.awt.event.ActionListener;
-import Triangle.SyntacticAnalyzer.SourceFile;
-import Triangle.SyntacticAnalyzer.Scanner;
+import Triangle.LLVMCodeGenerator.LLVMGenerator;
 import Triangle.AbstractSyntaxTrees.Program;
-import Triangle.SyntacticAnalyzer.Parser;
-import Triangle.ContextualAnalyzer.Checker;
 import Triangle.CodeGenerator.Encoder;
+import Triangle.ContextualAnalyzer.Checker;
+import Triangle.SyntacticAnalyzer.Parser;
+import Triangle.SyntacticAnalyzer.Scanner;
+import Triangle.SyntacticAnalyzer.SourceFile;
+import Triangle.SyntacticAnalyzer.SourcePosition;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 
-
-
-/** 
- * This is merely a reimplementation of the Triangle.Compiler class. We need
- * to get to the ASTs in order to draw them in the IDE without modifying the
- * original Triangle code.
- *
- * @author Luis Leopoldo Perez <luiperpe@ns.isi.ulatina.ac.cr>
- */
 public class IDECompiler {
 
-    // <editor-fold defaultstate="collapsed" desc=" Methods ">
+    private Scanner scanner;
+    private Parser parser;
+    private Checker checker;
+    private Encoder encoder;
+    private LLVMGenerator llvmGenerator;
+    
+    public IDEReporter report;
+    public Program rootAST;
+
     /**
-     * Creates a new instance of IDECompiler.
-     *
+     * Constructor
      */
     public IDECompiler() {
+        this.report = new IDEReporter();
     }
-    
+
     /**
-     * Particularly the same compileProgram method from the Triangle.Compiler
-     * class.
-     * @param sourceName Path to the source file.
-     * @return True if compilation was succesful.
+     * Compile Triangle program to TAM code
      */
-    public boolean compileProgram(String sourceName) {
-        System.out.println("********** " +
-                           "Triangle Compiler (IDE-Triangle 1.0)" +
-                           " **********");
-        
-        System.out.println("Syntactic Analysis ...");
+    public boolean compileProgram(String sourceName, String objectName, boolean showTable) {
+        System.out.println("********** Triangle Compiler (TAM Mode) **********");
+
         SourceFile source = new SourceFile(sourceName);
-        Scanner scanner = new Scanner(source);
+
+        if (source == null) {
+            System.out.println("Can't access source file " + sourceName);
+            return false;
+        }
+
+        scanner = new Scanner(source);
         report = new IDEReporter();
-        Parser parser = new Parser(scanner, report);
-        boolean success = false;
-        
+        parser = new Parser(scanner, report);
+        checker = new Checker(report);
+        encoder = new Encoder(report);
+
+        // Syntactic Analysis
+        System.out.println("Syntactic Analysis ...");
         rootAST = parser.parseProgram();
+
         if (report.numErrors == 0) {
+            // Contextual Analysis
             System.out.println("Contextual Analysis ...");
-            Checker checker = new Checker(report);
             checker.check(rootAST);
+
             if (report.numErrors == 0) {
-                System.out.println("Code Generation ...");
-                Encoder encoder = new Encoder(report);
-                encoder.encodeRun(rootAST, false);
-                
+                // Code Generation
+                System.out.println("TAM Code Generation ...");
+                encoder.encodeRun(rootAST, showTable);
+
                 if (report.numErrors == 0) {
-                    encoder.saveObjectProgram(sourceName.replace(".tri", ".tam"));
-                    success = true;
+                    try {
+                        encoder.saveObjectProgram(objectName);
+                        System.out.println("TAM compilation was successful.");
+                        return true;
+                    } catch (Exception e) {
+                        System.out.println("Error saving object file: " + e.getMessage());
+                        // Usar reportMessage en lugar de reportError
+                        System.err.println("Could not save TAM object file: " + e.getMessage());
+                        return false;
+                    }
                 }
             }
         }
 
-        if (success)
-            System.out.println("Compilation was successful.");
-        else
-            System.out.println("Compilation was unsuccessful.");
-        
-        return(success);
+        System.out.println("TAM compilation was unsuccessful.");
+        return false;
     }
-      
+
     /**
-     * Returns the line number where the first error is.
-     * @return Line number.
+     * Compile Triangle program to LLVM IR
      */
-    public int getErrorPosition() {
-        return(report.getFirstErrorPosition());
+    public boolean compileProgramToLLVM(String sourceName) {
+        System.out.println("********** Triangle Compiler (LLVM Mode) **********");
+
+        SourceFile source = new SourceFile(sourceName);
+
+        if (source == null) {
+            System.out.println("Can't access source file " + sourceName);
+            return false;
+        }
+
+        scanner = new Scanner(source);
+        report = new IDEReporter();
+        parser = new Parser(scanner, report);
+        checker = new Checker(report);
+        llvmGenerator = new LLVMGenerator();
+
+        // Syntactic Analysis
+        System.out.println("Syntactic Analysis ...");
+        rootAST = parser.parseProgram();
+
+        if (report.numErrors == 0) {
+            // Contextual Analysis
+            System.out.println("Contextual Analysis ...");
+            checker.check(rootAST);
+
+            if (report.numErrors == 0) {
+                // LLVM Code Generation
+                System.out.println("LLVM Code Generation ...");
+                try {
+                    llvmGenerator.generateRun(rootAST, sourceName);
+                    System.out.println("LLVM compilation was successful.");
+                    return true;
+                } catch (Exception e) {
+                    System.out.println("Error during LLVM generation: " + e.getMessage());
+                    e.printStackTrace();
+                    // Solo imprimir el error, no usar reportError
+                    System.err.println("LLVM generation failed: " + e.getMessage());
+                    return false;
+                }
+            }
+        }
+
+        System.out.println("LLVM compilation was unsuccessful.");
+        return false;
     }
-        
+
     /**
-     * Returns the root Abstract Syntax Tree.
-     * @return Program AST (root).
+     * Get the generated LLVM code from file
      */
-    public Program getAST() {
-        return(rootAST);
+    public String getLLVMCode(String sourceName) {
+        String llvmFileName = sourceName.replace(".tri", ".ll");
+        StringBuilder content = new StringBuilder();
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(llvmFileName))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                content.append(line).append("\n");
+            }
+            return content.toString();
+        } catch (IOException e) {
+            System.err.println("Error reading LLVM file: " + e.getMessage());
+            return "; Error: Could not read LLVM file\n; File: " + llvmFileName + "\n; " + e.getMessage();
+        }
     }
-    // </editor-fold>
-    
-    // <editor-fold defaultstate="collapsed" desc=" Attributes ">
-    private Program rootAST;        // The Root Abstract Syntax Tree.    
-    private IDEReporter report;     // Our ErrorReporter class.
-    // </editor-fold>
+
+    /**
+     * Get the last generated LLVM file path
+     */
+    public String getLLVMFilePath(String sourceName) {
+        return sourceName.replace(".tri", ".ll");
+    }
 }

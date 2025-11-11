@@ -1,6 +1,7 @@
 /*
- * IDE-Triangle v1.0
+ * IDE-Triangle v1.1
  * Main.java
+ * Extended with LLVM support
  */
 
 package GUI;
@@ -9,7 +10,6 @@ import Core.Console.OutputRedirector;
 import Core.IDE.IDEDisassembler;
 import Core.IDE.IDEInterpreter;
 import Core.Visitors.TableVisitor;
-// import com.sun.java.swing.plaf.windows.WindowsLookAndFeel;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.ClipboardOwner;
@@ -20,17 +20,17 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.MouseListener;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileReader;
-import java.io.BufferedReader;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import javax.swing.ImageIcon;
-import java.awt.Image;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
-import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import Triangle.IDECompiler;
 import Core.ExampleFileFilter;
@@ -38,11 +38,12 @@ import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 import Core.Visitors.TreeVisitor;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
  * The Main class. Contains the main form.
  *
- * @author Luis Leopoldo P�rez <luiperpe@ns.isi.ulatina.ac.cr>
+ * @author Luis Leopoldo Pérez <luiperpe@ns.isi.ulatina.ac.cr>
  */
 public class Main extends javax.swing.JFrame {
 
@@ -95,9 +96,12 @@ public class Main extends javax.swing.JFrame {
             copyMenuItem.setEnabled(false);
             pasteMenuItem.setEnabled(false);            
             compileMenuItem.setEnabled(false);
-            runMenuItem.setEnabled(false);           
-        } else
+            runMenuItem.setEnabled(false);
+            compileLLVMMenuItem.setEnabled(false);
+        } else {
             checkSaveChanges();
+            compileLLVMMenuItem.setEnabled(true);
+        }
     }
     
     /**
@@ -128,6 +132,7 @@ public class Main extends javax.swing.JFrame {
         pasteMenuItem.setEnabled(true);
         compileMenuItem.setEnabled(true);
         buttonCompile.setEnabled(true);
+        compileLLVMMenuItem.setEnabled(true);
        
         checkSaveChanges();        
         return(x);
@@ -146,6 +151,25 @@ public class Main extends javax.swing.JFrame {
         chooser.setCurrentDirectory(directory);
         
         return(chooser);
+    }
+    
+    /**
+     * Create LLVM display frame
+     */
+    private void createLLVMFrame() {
+        llvmFrame = new javax.swing.JInternalFrame("LLVM Code", true, true, true, true);
+        llvmCodeArea = new javax.swing.JTextArea();
+        llvmCodeArea.setEditable(false);
+        llvmCodeArea.setFont(new java.awt.Font("Consolas", 0, 12));
+        llvmCodeArea.setTabSize(2);
+        
+        javax.swing.JScrollPane scrollPane = new javax.swing.JScrollPane(llvmCodeArea);
+        llvmFrame.getContentPane().add(scrollPane);
+        llvmFrame.setSize(700, 500);
+        llvmFrame.setLocation(50, 50);
+        llvmFrame.setVisible(false);
+        
+        desktopPane.add(llvmFrame);
     }
 
     /**
@@ -194,7 +218,7 @@ public class Main extends javax.swing.JFrame {
         aboutMenuItem = new javax.swing.JMenuItem();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("IDE-Triangle 1.1");
+        setTitle("IDE-Triangle 1.1 (LLVM)");
         setFont(new java.awt.Font("Tahoma", 0, 11));
         setIconImage(new ImageIcon(this.getClass().getResource("Icons/iconMain.gif")).getImage());
         setLocationByPlatform(true);
@@ -206,8 +230,8 @@ public class Main extends javax.swing.JFrame {
         });
 
         toolBarsPanel.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
-
         toolBarsPanel.setFocusable(false);
+        
         fileToolBar.setFocusable(false);
         fileToolBar.setName("File");
         fileToolBar.setRequestFocusEnabled(false);
@@ -222,7 +246,6 @@ public class Main extends javax.swing.JFrame {
                 newMenuItemActionPerformed(evt);
             }
         });
-
         fileToolBar.add(buttonNew);
 
         buttonOpen.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconFileOpen.gif")));
@@ -236,7 +259,6 @@ public class Main extends javax.swing.JFrame {
                 openMenuItemActionPerformed(evt);
             }
         });
-
         fileToolBar.add(buttonOpen);
 
         buttonSave.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconFileSave.gif")));
@@ -251,9 +273,7 @@ public class Main extends javax.swing.JFrame {
                 saveMenuItemActionPerformed(evt);
             }
         });
-
         fileToolBar.add(buttonSave);
-
         toolBarsPanel.add(fileToolBar);
 
         editToolBar.setFocusable(false);
@@ -271,7 +291,6 @@ public class Main extends javax.swing.JFrame {
                 cutMenuItemActionPerformed(evt);
             }
         });
-
         editToolBar.add(buttonCut);
 
         buttonCopy.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconEditCopy.gif")));
@@ -286,7 +305,6 @@ public class Main extends javax.swing.JFrame {
                 copyMenuItemActionPerformed(evt);
             }
         });
-
         editToolBar.add(buttonCopy);
 
         buttonPaste.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconEditPaste.gif")));
@@ -301,9 +319,7 @@ public class Main extends javax.swing.JFrame {
                 pasteMenuItemActionPerformed(evt);
             }
         });
-
         editToolBar.add(buttonPaste);
-
         toolBarsPanel.add(editToolBar);
 
         triangleToolBar.setFocusable(false);
@@ -321,7 +337,6 @@ public class Main extends javax.swing.JFrame {
                 compileMenuItemActionPerformed(evt);
             }
         });
-
         triangleToolBar.add(buttonCompile);
 
         buttonRun.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconTriangleRun.gif")));
@@ -336,9 +351,7 @@ public class Main extends javax.swing.JFrame {
                 runMenuItemActionPerformed(evt);
             }
         });
-
         triangleToolBar.add(buttonRun);
-
         toolBarsPanel.add(triangleToolBar);
 
         getContentPane().add(toolBarsPanel, java.awt.BorderLayout.NORTH);
@@ -351,7 +364,7 @@ public class Main extends javax.swing.JFrame {
         fileMenu.setMnemonic('F');
         fileMenu.setText("File");
         fileMenu.setBorderPainted(true);
-        newMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_MASK));
+        newMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_N, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         newMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconFileNew.gif")));
         newMenuItem.setMnemonic('N');
         newMenuItem.setText("New");
@@ -361,10 +374,9 @@ public class Main extends javax.swing.JFrame {
                 newMenuItemActionPerformed(evt);
             }
         });
-
         fileMenu.add(newMenuItem);
 
-        openMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_O, java.awt.event.InputEvent.CTRL_MASK));
+        openMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_O, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         openMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconFileOpen.gif")));
         openMenuItem.setMnemonic('O');
         openMenuItem.setText("Open");
@@ -373,10 +385,9 @@ public class Main extends javax.swing.JFrame {
                 openMenuItemActionPerformed(evt);
             }
         });
-
         fileMenu.add(openMenuItem);
 
-        saveMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.CTRL_MASK));
+        saveMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_S, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         saveMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconFileSave.gif")));
         saveMenuItem.setMnemonic('S');
         saveMenuItem.setText("Save");
@@ -386,7 +397,6 @@ public class Main extends javax.swing.JFrame {
                 saveMenuItemActionPerformed(evt);
             }
         });
-
         fileMenu.add(saveMenuItem);
 
         saveAsMenuItem.setMnemonic('A');
@@ -397,9 +407,7 @@ public class Main extends javax.swing.JFrame {
                 saveAsMenuItemActionPerformed(evt);
             }
         });
-
         fileMenu.add(saveAsMenuItem);
-
         fileMenu.add(separatorExit);
 
         exitMenuItem.setMnemonic('x');
@@ -409,15 +417,13 @@ public class Main extends javax.swing.JFrame {
                 exitMenuItemActionPerformed(evt);
             }
         });
-
         fileMenu.add(exitMenuItem);
-
         menuBar.add(fileMenu);
 
         editMenu.setMnemonic('E');
         editMenu.setText("Edit");
         editMenu.setBorderPainted(true);
-        cutMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_X, java.awt.event.InputEvent.CTRL_MASK));
+        cutMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_X, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         cutMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconEditCut.gif")));
         cutMenuItem.setMnemonic('t');
         cutMenuItem.setText("Cut");
@@ -427,10 +433,9 @@ public class Main extends javax.swing.JFrame {
                 cutMenuItemActionPerformed(evt);
             }
         });
-
         editMenu.add(cutMenuItem);
 
-        copyMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_C, java.awt.event.InputEvent.CTRL_MASK));
+        copyMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_C, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         copyMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconEditCopy.gif")));
         copyMenuItem.setMnemonic('C');
         copyMenuItem.setText("Copy");
@@ -440,10 +445,9 @@ public class Main extends javax.swing.JFrame {
                 copyMenuItemActionPerformed(evt);
             }
         });
-
         editMenu.add(copyMenuItem);
 
-        pasteMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V, java.awt.event.InputEvent.CTRL_MASK));
+        pasteMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_V, java.awt.event.InputEvent.CTRL_DOWN_MASK));
         pasteMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/GUI/Icons/iconEditPaste.gif")));
         pasteMenuItem.setMnemonic('P');
         pasteMenuItem.setText("Paste");
@@ -454,9 +458,7 @@ public class Main extends javax.swing.JFrame {
                 pasteMenuItemActionPerformed(evt);
             }
         });
-
         editMenu.add(pasteMenuItem);
-
         menuBar.add(editMenu);
 
         triangleMenu.setMnemonic('T');
@@ -472,7 +474,6 @@ public class Main extends javax.swing.JFrame {
                 compileMenuItemActionPerformed(evt);
             }
         });
-
         triangleMenu.add(compileMenuItem);
 
         runMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F6, 0));
@@ -485,9 +486,56 @@ public class Main extends javax.swing.JFrame {
                 runMenuItemActionPerformed(evt);
             }
         });
-
         triangleMenu.add(runMenuItem);
-
+        
+        triangleMenu.addSeparator();
+        
+        // LLVM menu items
+        compileLLVMMenuItem = new javax.swing.JMenuItem();
+        compileLLVMMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(
+            java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        compileLLVMMenuItem.setText("Compile to LLVM");
+        compileLLVMMenuItem.setEnabled(false);
+        compileLLVMMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                compileLLVMMenuItemActionPerformed(evt);
+            }
+        });
+        triangleMenu.add(compileLLVMMenuItem);
+        
+        saveLLVMMenuItem = new javax.swing.JMenuItem();
+        saveLLVMMenuItem.setText("Save LLVM Code");
+        saveLLVMMenuItem.setEnabled(false);
+        saveLLVMMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveLLVMMenuItemActionPerformed(evt);
+            }
+        });
+        triangleMenu.add(saveLLVMMenuItem);
+        
+        compileLLVMToNativeMenuItem = new javax.swing.JMenuItem();
+        compileLLVMToNativeMenuItem.setText("Compile LLVM to Native");
+        compileLLVMToNativeMenuItem.setEnabled(false);
+        compileLLVMToNativeMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                compileLLVMToNativeActionPerformed(evt);
+            }
+        });
+        triangleMenu.add(compileLLVMToNativeMenuItem);
+        
+        runLLVMMenuItem = new javax.swing.JMenuItem();
+        runLLVMMenuItem.setAccelerator(javax.swing.KeyStroke.getKeyStroke(
+            java.awt.event.KeyEvent.VK_R, 
+            java.awt.event.InputEvent.CTRL_DOWN_MASK | java.awt.event.InputEvent.SHIFT_DOWN_MASK));
+        runLLVMMenuItem.setText("Run LLVM Program");
+        runLLVMMenuItem.setEnabled(false);
+        runLLVMMenuItem.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                runLLVMMenuItemActionPerformed(evt);
+            }
+        });
+        triangleMenu.add(runLLVMMenuItem);
+        
         menuBar.add(triangleMenu);
 
         helpMenu.setMnemonic('H');
@@ -501,21 +549,16 @@ public class Main extends javax.swing.JFrame {
                 aboutMenuItemActionPerformed(evt);
             }
         });
-
         helpMenu.add(aboutMenuItem);
-
         menuBar.add(helpMenu);
 
         setJMenuBar(menuBar);
-
+        createLLVMFrame();
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     // <editor-fold defaultstate="collapsed" desc=" Event Handlers Implementation ">
     
-    /**
-     * Handles the "Run TAM Program" button and menu option.
-     */
     private void runMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_runMenuItemActionPerformed
         ((FileFrame)desktopPane.getSelectedFrame()).clearConsole();
         ((FileFrame)desktopPane.getSelectedFrame()).selectConsole();
@@ -527,9 +570,6 @@ public class Main extends javax.swing.JFrame {
         interpreter.Run(desktopPane.getSelectedFrame().getTitle().replace(".tri", ".tam"));
     }//GEN-LAST:event_runMenuItemActionPerformed
 
-    /** 
-     * Handles the "Close" program option
-     */
     private void formWindowClosing(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowClosing
         while (desktopPane.getComponentCount() > 0) {
             try { 
@@ -538,31 +578,19 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_formWindowClosing
 
-    /** 
-     * Handles the "Paste Text" button and menu option.
-     */
     private void pasteMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_pasteMenuItemActionPerformed
         ((FileFrame)desktopPane.getSelectedFrame()).pasteText(Clip.getClipboardContents());
     }//GEN-LAST:event_pasteMenuItemActionPerformed
 
-    /**
-     * Handles the "Cut Text" button and menu option.
-     */
     private void cutMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cutMenuItemActionPerformed
         Clip.setClipboardContents(((FileFrame)desktopPane.getSelectedFrame()).getSelectedText());
         ((FileFrame)desktopPane.getSelectedFrame()).cutText();
     }//GEN-LAST:event_cutMenuItemActionPerformed
 
-    /**
-     * Handles the "Copy Text" button and menu option.
-     */
     private void copyMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_copyMenuItemActionPerformed
         Clip.setClipboardContents(((FileFrame)desktopPane.getSelectedFrame()).getSelectedText());
     }//GEN-LAST:event_copyMenuItemActionPerformed
 
-    /** 
-     * Handles the "Save As" button and menu option.
-     */
     private void saveAsMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveAsMenuItemActionPerformed
         boolean _previouslySaved = ((FileFrame)desktopPane.getSelectedFrame()).getPreviouslySaved();        
         ((FileFrame)desktopPane.getSelectedFrame()).setPreviouslySaved(false);
@@ -570,16 +598,10 @@ public class Main extends javax.swing.JFrame {
         ((FileFrame)desktopPane.getSelectedFrame()).setPreviouslySaved(_previouslySaved);        
     }//GEN-LAST:event_saveAsMenuItemActionPerformed
 
-    /**
-     * Handles the "About" menu option.
-     */
     private void aboutMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_aboutMenuItemActionPerformed
         new AboutDialog(this, true).setVisible(true);
     }//GEN-LAST:event_aboutMenuItemActionPerformed
 
-    /**
-     * Handles the "Open File" button and menu option.
-     */
     private void openMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_openMenuItemActionPerformed
         JFileChooser chooser = drawFileChooser();
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
@@ -597,9 +619,6 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_openMenuItemActionPerformed
 
-    /**
-     * Handles the "Compile" button and menu option.
-     */
     private void compileMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_compileMenuItemActionPerformed
         if ((!((FileFrame)desktopPane.getSelectedFrame()).getPreviouslySaved()) || ((FileFrame)desktopPane.getSelectedFrame()).hasChanged()) {
             saveMenuItemActionPerformed(null);
@@ -613,26 +632,25 @@ public class Main extends javax.swing.JFrame {
             ((FileFrame)desktopPane.getSelectedFrame()).clearTable();
             new File(desktopPane.getSelectedFrame().getTitle().replace(".tri", ".tam")).delete();
             
-            output.setDelegate(delegateConsole);            
-            if (compiler.compileProgram(desktopPane.getSelectedFrame().getTitle())) {           
+            output.setDelegate(delegateConsole);
+            String sourceName = desktopPane.getSelectedFrame().getTitle();
+            String objectName = sourceName.replace(".tri", ".tam");
+            
+            if (compiler.compileProgram(sourceName, objectName, false)) {           
                 output.setDelegate(delegateTAMCode);
-                disassembler.Disassemble(desktopPane.getSelectedFrame().getTitle().replace(".tri", ".tam"));
-                ((FileFrame)desktopPane.getSelectedFrame()).setTree((DefaultMutableTreeNode)treeVisitor.visitProgram(compiler.getAST(), null));
-                ((FileFrame)desktopPane.getSelectedFrame()).setTable(tableVisitor.getTable(compiler.getAST()));
+                disassembler.Disassemble(objectName);
+                ((FileFrame)desktopPane.getSelectedFrame()).setTree((DefaultMutableTreeNode)treeVisitor.visitProgram(compiler.rootAST, null));
+                ((FileFrame)desktopPane.getSelectedFrame()).setTable(tableVisitor.getTable(compiler.rootAST));
                 
                 runMenuItem.setEnabled(true);
                 buttonRun.setEnabled(true);
             } else {
-                ((FileFrame)desktopPane.getSelectedFrame()).highlightError(compiler.getErrorPosition());
                 runMenuItem.setEnabled(false);
                 buttonRun.setEnabled(false);
             }
         }
     }//GEN-LAST:event_compileMenuItemActionPerformed
 
-    /**
-     * Handles the "Save" button and menu option.
-     */
     private void saveMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveMenuItemActionPerformed
         String fileName = ((FileFrame)desktopPane.getSelectedFrame()).getTitle();
         boolean overwrite = true;
@@ -674,30 +692,191 @@ public class Main extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_saveMenuItemActionPerformed
 
-    /**
-     * Handles the "New File" button and menu option.
-     */
     private void newMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_newMenuItemActionPerformed
         addInternalFrame("Untitled-" + String.valueOf(untitledCount), "");      
         untitledCount++;
     }//GEN-LAST:event_newMenuItemActionPerformed
 
-    /**
-     * Handles the "Exit" menu option.
-     */
     private void exitMenuItemActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_exitMenuItemActionPerformed
         formWindowClosing(null);
         System.exit(0);
     }//GEN-LAST:event_exitMenuItemActionPerformed
 
+    // LLVM Event Handlers
+    private void compileLLVMMenuItemActionPerformed(java.awt.event.ActionEvent evt) {
+        if (desktopPane.getSelectedFrame() == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Please select a source file first.", 
+                "No File Selected", 
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        String sourceName = desktopPane.getSelectedFrame().getTitle();
+        ((FileFrame)desktopPane.getSelectedFrame()).selectConsole();
+        ((FileFrame)desktopPane.getSelectedFrame()).clearConsole();
+        
+        output.setDelegate(delegateConsole);
+        
+        if (compiler.compileProgramToLLVM(sourceName)) {
+            String llvmCode = compiler.getLLVMCode(sourceName);
+            llvmCodeArea.setText(llvmCode);
+            llvmFrame.setVisible(true);
+            
+            try {
+                llvmFrame.setSelected(true);
+            } catch (java.beans.PropertyVetoException e) { }
+            
+            currentLLVMFile = compiler.getLLVMFilePath(sourceName);
+            
+            saveLLVMMenuItem.setEnabled(true);
+            compileLLVMToNativeMenuItem.setEnabled(true);
+            runLLVMMenuItem.setEnabled(false);
+        } else {
+            JOptionPane.showMessageDialog(this, 
+                "Compilation failed. Check console for errors.", 
+                "Compilation Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void saveLLVMMenuItemActionPerformed(java.awt.event.ActionEvent evt) {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save LLVM Code");
+        fileChooser.setFileFilter(new FileNameExtensionFilter("LLVM IR Files (*.ll)", "ll"));
+        
+        if (currentLLVMFile != null) {
+            fileChooser.setSelectedFile(new File(currentLLVMFile));
+        }
+        
+        if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            String filePath = file.getAbsolutePath();
+            if (!filePath.endsWith(".ll")) {
+                filePath += ".ll";
+            }
+            
+            try (PrintWriter writer = new PrintWriter(filePath)) {
+                writer.print(llvmCodeArea.getText());
+                JOptionPane.showMessageDialog(this, 
+                    "LLVM code saved successfully!", 
+                    "Success", 
+                    JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this, 
+                    "Error saving file: " + e.getMessage(), 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    private void compileLLVMToNativeActionPerformed(java.awt.event.ActionEvent evt) {
+        if (currentLLVMFile == null) {
+            JOptionPane.showMessageDialog(this, 
+                "No LLVM file to compile.", 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        String execFile = currentLLVMFile.replace(".ll", "");
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            execFile += ".exe";
+        }
+        
+        output.setDelegate(delegateConsole);
+        
+        try {
+            ProcessBuilder pb = new ProcessBuilder("clang", currentLLVMFile, "-o", execFile);
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream())
+            );
+            
+            String line;
+            while ((line = reader.readLine()) != null) {
+                ((FileFrame)desktopPane.getSelectedFrame()).writeToConsole(line + "\n");
+            }
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                JOptionPane.showMessageDialog(this, 
+                    "Compilation to native code successful!\nExecutable: " + execFile, 
+                    "Success", 
+                    JOptionPane.INFORMATION_MESSAGE);
+                runLLVMMenuItem.setEnabled(true);
+            } else {
+                JOptionPane.showMessageDialog(this, 
+                    "Compilation failed. Check console for errors.", 
+                    "Error", 
+                    JOptionPane.ERROR_MESSAGE);
+            }
+            
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, 
+                "Clang compiler not found.\nPlease install LLVM/Clang and add it to your PATH.", 
+                "Compiler Not Found", 
+                JOptionPane.ERROR_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, 
+                "Error during compilation: " + e.getMessage(), 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void runLLVMMenuItemActionPerformed(java.awt.event.ActionEvent evt) {
+        if (currentLLVMFile == null) {
+            JOptionPane.showMessageDialog(this, 
+                "No program to run.", 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        String execFile = currentLLVMFile.replace(".ll", "");
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            execFile += ".exe";
+        }
+        
+        File executable = new File(execFile);
+        if (!executable.exists()) {
+            JOptionPane.showMessageDialog(this, 
+                "Executable not found. Please compile to native first.", 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            ProcessBuilder pb;
+            
+            if (os.contains("win")) {
+                pb = new ProcessBuilder("cmd", "/c", "start", "cmd", "/k", execFile);
+            } else if (os.contains("mac")) {
+                pb = new ProcessBuilder("open", "-a", "Terminal", execFile);
+            } else {
+                pb = new ProcessBuilder("x-terminal-emulator", "-e", execFile);
+            }
+            
+            pb.start();
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, 
+                "Error running program: " + e.getMessage(), 
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
     // </editor-fold>    
            
     // <editor-fold defaultstate="collapsed" desc=" Delegates and Listeners ">    
-    /**
-     * Runs every time a key is pressed in the text editor frame, thus
-     * determining if the file contents have changed, activating the
-     * "Save" button and menu option.
-     */   
     KeyAdapter delegateSaveButton = new KeyAdapter() {
         public void keyReleased(java.awt.event.KeyEvent evt) {
              checkSaveChanges();
@@ -709,46 +888,22 @@ public class Main extends javax.swing.JFrame {
         public void mouseClicked(java.awt.event.MouseEvent evt) {
             ((FileFrame)desktopPane.getSelectedFrame()).UpdateRowColNumbers();
         }
-        
-        public void mouseExited(java.awt.event.MouseEvent evt) {
-        }
-
-        public void mouseEntered(java.awt.event.MouseEvent evt) {
-        }        
-        
-        public void mouseReleased(java.awt.event.MouseEvent evt) {
-        }       
-
-        public void mousePressed(java.awt.event.MouseEvent evt) {
-        }        
+        public void mouseExited(java.awt.event.MouseEvent evt) { }
+        public void mouseEntered(java.awt.event.MouseEvent evt) { }        
+        public void mouseReleased(java.awt.event.MouseEvent evt) { }       
+        public void mousePressed(java.awt.event.MouseEvent evt) { }        
     };
     
-    /**
-     * Several events for the MDI text editor frames. 
-     */
     InternalFrameListener delegateInternalFrame = new InternalFrameListener() {        
-        
-        /**
-         * Every time a frame is focused/activated, some buttons can be
-         * enabled (e.g. "Save", "Cut", "Copy", "Paste").
-         */
         public void internalFrameActivated(InternalFrameEvent evt) { 
             checkPaneChanges();
             ((FileFrame)desktopPane.getSelectedFrame()).UpdateRowColNumbers();
         }
         
-        /**
-         * Every time a frame is closed, some buttons can be
-         * disabled (e.g. "Save", "Cut", "Copy", "Paste").
-         */        
         public void internalFrameClosed(InternalFrameEvent evt) {
             checkPaneChanges();
         }
             
-        /**
-         * Before closing a frame, checks if the file has not been
-         * saved yet.
-         */
         public void internalFrameClosing(InternalFrameEvent evt) {
             if (((FileFrame)desktopPane.getSelectedFrame()).hasChanged()) { 
                 if (JOptionPane.showConfirmDialog(null, "Do you want to save the changes to " + desktopPane.getSelectedFrame().getTitle() + "?", "Save", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION)    
@@ -756,17 +911,12 @@ public class Main extends javax.swing.JFrame {
             }
         }
         
-        // Required by interface - not implemented
         public void internalFrameDeactivated(InternalFrameEvent evt) { }
         public void internalFrameDeiconified(InternalFrameEvent evt) { }
         public void internalFrameIconified(InternalFrameEvent evt) { }
         public void internalFrameOpened(InternalFrameEvent evt) { }
     };
     
-    
-    /**
-     * Used to redirect the console output - writes in the "Console" panel.     
-     */
     ActionListener delegateConsole = new ActionListener() {
         public void actionPerformed(ActionEvent e) {
             while (output.peekQueue())
@@ -774,9 +924,6 @@ public class Main extends javax.swing.JFrame {
         }
     };
     
-    /**
-     * Used to redirect the console output - writes in the "TAM Code" pane.
-     */
     ActionListener delegateTAMCode = new ActionListener() {
         public void actionPerformed(ActionEvent e) {
             while (output.peekQueue())
@@ -784,18 +931,12 @@ public class Main extends javax.swing.JFrame {
         }        
     };
     
-    /**
-     * Used to redirect the console input - enables the "Console Input" text box.
-     */
     ActionListener delegateInput = new ActionListener() {
         public void actionPerformed(ActionEvent e) {
             ((FileFrame)desktopPane.getSelectedFrame()).setInputEnabled(true);
         }
     };
     
-    /**
-     * Used to redirect the console input - writes the user input in the console.
-     */
     ActionListener delegateEnter = new ActionListener() {
         public void actionPerformed(ActionEvent e) {
             ((FileFrame)desktopPane.getSelectedFrame()).setInputEnabled(false);
@@ -804,9 +945,6 @@ public class Main extends javax.swing.JFrame {
         }
     };
     
-    /**
-     * Used to control running programs - only one TAM program can be run at once
-     */
     ActionListener delegateRun = new ActionListener() {
         public void actionPerformed(ActionEvent e) {
             runMenuItem.setEnabled(true);
@@ -849,48 +987,41 @@ public class Main extends javax.swing.JFrame {
     javax.swing.JPanel toolBarsPanel;
     javax.swing.JMenu triangleMenu;
     javax.swing.JToolBar triangleToolBar;
+    
+    // LLVM Components
+    private javax.swing.JMenuItem compileLLVMMenuItem;
+    private javax.swing.JMenuItem saveLLVMMenuItem;
+    private javax.swing.JMenuItem compileLLVMToNativeMenuItem;
+    private javax.swing.JMenuItem runLLVMMenuItem;
+    private javax.swing.JInternalFrame llvmFrame;
+    private javax.swing.JTextArea llvmCodeArea;
+    private String currentLLVMFile = null;
     // End of variables declaration//GEN-END:variables
     // </editor-fold>
     
     // <editor-fold defaultstate="collapsed" desc=" Non-GUI Variables ">
-    // [ Non-GUI variables declaration ]
-    int untitledCount = 1;                                                  // Counts "Untitled" document names (e.g. "Untitled-1")
-    clipBoard Clip = new clipBoard();                                       // Clipboard Management
-    IDECompiler compiler = new IDECompiler();                               // Compiler - Analyzes/generates TAM programs
-    IDEDisassembler disassembler = new IDEDisassembler();                   // Disassembler - Generates TAM Code
-    IDEInterpreter interpreter = new IDEInterpreter(delegateRun);           // Interpreter - Runs TAM programs
-    OutputRedirector output = new OutputRedirector();                       // Redirects the console output
-    InputRedirector input = new InputRedirector(delegateInput);             // Redirects console input
-    TreeVisitor treeVisitor = new TreeVisitor();                            // Draws the Abstract Syntax Trees
-    TableVisitor tableVisitor = new TableVisitor();                         // Draws the Identifier Table
-    File directory;                                                         // The current directory.
-    // [ End of Non-GUI variables declaration ]
+    int untitledCount = 1;
+    clipBoard Clip = new clipBoard();
+    IDECompiler compiler = new IDECompiler();
+    IDEDisassembler disassembler = new IDEDisassembler();
+    IDEInterpreter interpreter = new IDEInterpreter(delegateRun);
+    OutputRedirector output = new OutputRedirector();
+    InputRedirector input = new InputRedirector(delegateInput);
+    TreeVisitor treeVisitor = new TreeVisitor();
+    TableVisitor tableVisitor = new TableVisitor();
+    File directory;
     // </editor-fold>    
     
     // <editor-fold defaultstate="collapsed" desc=" Internal Class - ClipboardOwner ">
-    /**
-     * ClipboardOwner Class
-     * Internal clipboard management class, uses the default system clipboard.
-     */
     private class clipBoard implements ClipboardOwner {
-        
-        /**
-         * Required by interface - not implemented
-         */
         public void lostOwnership(Clipboard aClipboard, Transferable aContents) { }
         
-        /**
-         * Sets the clipboard contents
-         */
         public void setClipboardContents(String _contents) {
             StringSelection stringSelection = new StringSelection(_contents);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             clipboard.setContents(stringSelection, this);
         }
         
-        /**
-         * Returns the clipboard contents
-         */
         public String getClipboardContents() {
             String ret = "";
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -909,6 +1040,5 @@ public class Main extends javax.swing.JFrame {
             return(ret);
         }        
     }
-    
     // </editor-fold>
 }

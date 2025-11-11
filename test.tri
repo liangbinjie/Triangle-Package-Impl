@@ -1,0 +1,11 @@
+! test1.tri - Simple arithmetic
+let
+    var x: Integer;
+    var y: Integer
+in
+    begin
+        x := 10;
+        y := 20;
+        putint(x + y);
+        puteol()
+    end

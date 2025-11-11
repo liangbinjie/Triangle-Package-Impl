@@ -2,6 +2,9 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group/>
+        <group>
+            <file>file:/E:/U/COMPUTACION/COMPUTACION%20SEMESTRE%20VI/Compiladores%20e%20Interpretes/Triangle-Package-Impl/Triangle/src/Triangle/Compiler.java</file>
+            <file>file:/E:/U/COMPUTACION/COMPUTACION%20SEMESTRE%20VI/Compiladores%20e%20Interpretes/Triangle-Package-Impl/Triangle/src/Triangle/LLVMCodeGenerator/LLVMGenerator.java</file>
+        </group>
     </open-files>
 </project-private>
