@@ -780,12 +780,39 @@ public class Main extends javax.swing.JFrame {
             return;
         }
         
+        // Buscar un FileFrame abierto para mostrar la salida
+        FileFrame targetFrame = null;
+        for (javax.swing.JInternalFrame frame : desktopPane.getAllFrames()) {
+            if (frame instanceof FileFrame) {
+                targetFrame = (FileFrame) frame;
+                break;
+            }
+        }
+        
+        if (targetFrame == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Please open a source file window to see compilation output.", 
+                "No File Window", 
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // Seleccionar la consola del FileFrame encontrado
+        final FileFrame fileFrame = targetFrame;
+        fileFrame.selectConsole();
+        fileFrame.clearConsole();
+        
         String execFile = currentLLVMFile.replace(".ll", "");
         if (System.getProperty("os.name").toLowerCase().contains("win")) {
             execFile += ".exe";
         }
         
-        output.setDelegate(delegateConsole);
+        output.setDelegate(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                while (output.peekQueue())
+                    fileFrame.writeToConsole(output.readQueue());
+            }
+        });
         
         try {
             ProcessBuilder pb = new ProcessBuilder("clang", currentLLVMFile, "-o", execFile);
@@ -798,7 +825,7 @@ public class Main extends javax.swing.JFrame {
             
             String line;
             while ((line = reader.readLine()) != null) {
-                ((FileFrame)desktopPane.getSelectedFrame()).writeToConsole(line + "\n");
+                fileFrame.writeToConsole(line + "\n");
             }
             
             int exitCode = process.waitFor();
