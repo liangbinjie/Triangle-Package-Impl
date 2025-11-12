@@ -17,7 +17,7 @@
 
 package Triangle;
 
-import Triangle.LLVMCodeGenerator.LLVMGenerator; // Cambio aquí
+import Triangle.LLVMCodeGenerator.LLVMCodeGenerator;
 import Triangle.AbstractSyntaxTrees.Program;
 import Triangle.CodeGenerator.Encoder;
 import Triangle.ContextualAnalyzer.Checker;
@@ -41,7 +41,7 @@ public class Compiler {
     private static Parser parser;
     private static Checker checker;
     private static Encoder encoder;
-    private static LLVMGenerator llvmGenerator; // Variable para LLVM
+    private static LLVMCodeGenerator llvmCodeGenerator; // Generador LLVM (nueva arquitectura)
     private static ErrorReporter reporter;
     private static Drawer drawer;
 
@@ -60,6 +60,7 @@ public class Compiler {
      * @param	showingTable	true iff the object description details are to
      *				be displayed during code generation (not
      *				currently implemented).
+     * @param   generateLLVM    true to use LLVM code generation
      * @return	true iff the source program is free of compile-time errors,
      *          otherwise false.
      */
@@ -67,7 +68,12 @@ public class Compiler {
                                    boolean showingAST, boolean showingTable,
                                    boolean generateLLVM) {
 
-        System.out.println("********** Triangle Compiler (LLVM Mode: " + generateLLVM + ") **********");
+        System.out.println("********** Triangle Compiler **********");
+        if (generateLLVM) {
+            System.out.println("Mode: LLVM Code Generation");
+        } else {
+            System.out.println("Mode: TAM Code Generation");
+        }
 
         SourceFile source = new SourceFile(sourceName);
 
@@ -81,9 +87,11 @@ public class Compiler {
         parser   = new Parser(scanner, reporter);
         checker  = new Checker(reporter);
 
-        // Inicializar encoder (TAM) o llvmGenerator según el modo
+        // Inicializar encoder (TAM) o llvmCodeGenerator según el modo
         if (generateLLVM) {
-            llvmGenerator = new LLVMGenerator();
+            // Obtener nombre del módulo del archivo fuente
+            String moduleName = sourceName.replaceAll("\\.[^.]+$", "");
+            llvmCodeGenerator = new LLVMCodeGenerator(moduleName);
         } else {
             encoder = new Encoder(reporter);
         }
@@ -101,7 +109,18 @@ public class Compiler {
             if (reporter.numErrors == 0) {
                 if (generateLLVM) {
                     System.out.println("LLVM Code Generation ...");
-                    llvmGenerator.generateRun(theAST, sourceName);
+                    // Usar el generador LLVM
+                    String llvmCode = llvmCodeGenerator.generateCode(theAST);
+                    
+                    // Guardar a archivo
+                    String outputFilename = sourceName.replaceAll("\\.[^.]+$", ".ll");
+                    try {
+                        llvmCodeGenerator.saveToFile(outputFilename);
+                        System.out.println("LLVM IR generated: " + outputFilename);
+                    } catch (Exception e) {
+                        System.out.println("Error saving LLVM file: " + e.getMessage());
+                        reporter.numErrors++;
+                    }
                 } else {
                     System.out.println("TAM Code Generation ...");
                     encoder.encodeRun(theAST, showingTable);	// 3rd pass

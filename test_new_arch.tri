@@ -1,0 +1,21 @@
+! Programa de prueba para la nueva arquitectura LLVM
+! Demuestra comandos básicos, expresiones y control de flujo
+
+let
+  var x: Integer;
+  var y: Integer;
+  var result: Integer
+in
+  begin
+    x := 10;
+    y := 20;
+    result := x + y;
+    
+    if result > 25 then
+      result := result * 2
+    else
+      result := result + 5;
+    
+    while x < y do
+      x := x + 1
+  end

@@ -6,7 +6,7 @@
 
 package Triangle;
 
-import Triangle.LLVMCodeGenerator.LLVMGenerator;
+import Triangle.LLVMCodeGenerator.LLVMCodeGenerator;
 import Triangle.AbstractSyntaxTrees.Program;
 import Triangle.CodeGenerator.Encoder;
 import Triangle.ContextualAnalyzer.Checker;
@@ -24,7 +24,7 @@ public class IDECompiler {
     private Parser parser;
     private Checker checker;
     private Encoder encoder;
-    private LLVMGenerator llvmGenerator;
+    private LLVMCodeGenerator llvmCodeGenerator;
     
     public IDEReporter report;
     public Program rootAST;
@@ -105,7 +105,7 @@ public class IDECompiler {
         report = new IDEReporter();
         parser = new Parser(scanner, report);
         checker = new Checker(report);
-        llvmGenerator = new LLVMGenerator();
+        llvmCodeGenerator = new LLVMCodeGenerator();
 
         // Syntactic Analysis
         System.out.println("Syntactic Analysis ...");
@@ -120,7 +120,7 @@ public class IDECompiler {
                 // LLVM Code Generation
                 System.out.println("LLVM Code Generation ...");
                 try {
-                    llvmGenerator.generateRun(rootAST, sourceName);
+                    llvmCodeGenerator.generateRun(rootAST, sourceName);
                     System.out.println("LLVM compilation was successful.");
                     return true;
                 } catch (Exception e) {
