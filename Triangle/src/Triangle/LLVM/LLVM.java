@@ -178,8 +178,7 @@ public class LLVM implements Visitor {
         codeIR.append("\n");
         codeIR.append(main.toString());          // Función main
         
-        guardarLLVM();
-        
+        System.out.println(codeIR);
     }
     
     public void guardarLLVM() {
@@ -191,6 +190,53 @@ public class LLVM implements Visitor {
         } catch (java.io.IOException e) {
             System.err.println("Error writing LLVM IR file: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+    
+    public void ejecutarLLVM() {
+        // Ejecutar el archivo LLVM optimizado usando lli (LLVM interpreter)
+        String llFileName = sourceFileName.replace(".tri", ".ll");
+        
+        try {
+            System.out.println("\n=== Ejecutando LLVM IR: " + llFileName + " ===\n");
+            
+            // Ejecutar: lli archivo_opt.ll
+            ProcessBuilder pb = new ProcessBuilder("lli", llFileName);
+            pb.inheritIO(); // Redirigir entrada/salida al terminal actual
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            System.out.println("\n=== Ejecución finalizada con código: " + exitCode + " ===");
+            
+        } catch (java.io.IOException e) {
+            System.err.println("Error: 'lli' no encontrado. Asegúrate de tener LLVM instalado.");
+        } catch (InterruptedException e) {
+            System.err.println("Ejecución interrumpida: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    public void optimizarLLVM() {
+        String filename = sourceFileName.replace(".tri", ".ll");
+        
+        try {
+            // Ejecutar: opt -O3 -S input.ll -o output_opt.ll
+            Process process = new ProcessBuilder("opt", "-O3", "-S", filename, "-o", filename).start();
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                System.out.println("LLVM IR optimized successfully: " + filename);
+            } else {
+                System.err.println("LLVM optimization failed with exit code: " + exitCode);
+            }
+            
+        } catch (java.io.IOException e) {
+            System.err.println("Error: 'opt' not found.");
+        } catch (InterruptedException e) {
+            System.err.println("Optimization interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt();
         }
     }
 
