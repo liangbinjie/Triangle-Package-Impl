@@ -7,8 +7,7 @@
 
 package Triangle;
 
-import Triangle.CodeGenerator.Frame;
-import java.awt.event.ActionListener;
+
 import Triangle.SyntacticAnalyzer.SourceFile;
 import Triangle.SyntacticAnalyzer.Scanner;
 import Triangle.AbstractSyntaxTrees.Program;
@@ -68,9 +67,6 @@ public class IDECompiler {
                     encoder.saveObjectProgram(sourceName.replace(".tri", ".tam"));
                     success = true;
                     
-                    LLVM llvmer = new LLVM(sourceName);
-                    llvmer.generarLLVM(rootAST);
-                    System.out.println("LLVM Code generated");
                 }
             }
         }
@@ -81,6 +77,37 @@ public class IDECompiler {
             System.out.println("Compilation was unsuccessful.");
         
         return(success);
+    }
+    
+    public void generarLLVM(String sourceFileName) {
+        llvmGenerator = new LLVM(sourceFileName);
+        llvmGenerator.generarLLVM(rootAST);
+        System.out.println("LLVM Code generated");
+    }
+    
+    public void guardarLLVM(String sourceFileName) {
+        if (llvmGenerator != null) {
+            llvmGenerator.guardarLLVM();
+            System.out.println("LLVM Code Saved");
+        } else {
+            System.err.println("Error: No LLVM code generated yet. Call generarLLVM() first.");
+        }
+    }
+    
+    public void ejecutarLLVM() {
+        if (llvmGenerator != null) {
+            llvmGenerator.ejecutarLLVM();
+        } else {
+            System.err.println("Error: No LLVM code generated yet. Call generarLLVM() first.");
+        }
+    }
+    
+    public void optimizarLLVM() {
+        if (llvmGenerator != null) {
+            llvmGenerator.optimizarLLVM();
+        } else {
+            System.err.println("Error: No LLVM code generated yet. Call generarLLVM() first.");
+        }
     }
       
     /**
@@ -103,5 +130,6 @@ public class IDECompiler {
     // <editor-fold defaultstate="collapsed" desc=" Attributes ">
     private Program rootAST;        // The Root Abstract Syntax Tree.    
     private IDEReporter report;     // Our ErrorReporter class.
+    private LLVM llvmGenerator;     // LLVM Code Generator instance
     // </editor-fold>
 }

@@ -84,7 +84,6 @@ public class Compiler {
         parser   = new Parser(scanner, reporter);
         checker  = new Checker(reporter);
         encoder  = new Encoder(reporter);
-        llvmer     = new LLVM(sourceName);
         drawer   = new Drawer();
 
         // scanner.enableDebugging();
@@ -102,7 +101,6 @@ public class Compiler {
                 System.out.println("Code Generation ...");
                 encoder.encodeRun(theAST, showingTable);	// 3rd pass
                 
-                llvmer.generarLLVM(theAST);
             }
         }
 
@@ -114,6 +112,19 @@ public class Compiler {
             System.out.println("Compilation was unsuccessful.");
         }
         return successful;
+    }
+    
+    public void generarLLVM(String sourceFileName) {
+        SourceFile source = new SourceFile(sourceFileName);
+
+        if (source == null) {
+            System.out.println("Can't access source file " + sourceFileName);
+            System.exit(1);
+        }
+        
+        llvmer = new LLVM(sourceFileName);
+        theAST = parser.parseProgram();
+        llvmer.generarLLVM(theAST);
     }
 
     /**

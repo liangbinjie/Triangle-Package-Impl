@@ -178,8 +178,7 @@ public class LLVM implements Visitor {
         codeIR.append("\n");
         codeIR.append(main.toString());          // Función main
         
-        guardarLLVM();
-        
+        System.out.println(codeIR);
     }
     
     public void guardarLLVM() {
@@ -193,63 +192,68 @@ public class LLVM implements Visitor {
             e.printStackTrace();
         }
     }
+    
+    public void ejecutarLLVM() {
+        // Ejecutar el archivo LLVM optimizado usando lli (LLVM interpreter)
+        String llFileName = sourceFileName.replace(".tri", ".ll");
+        
+        try {
+            System.out.println("\n=== Ejecutando LLVM IR: " + llFileName + " ===\n");
+            
+            // Ejecutar: lli archivo_opt.ll
+            ProcessBuilder pb = new ProcessBuilder("lli", llFileName);
+            pb.inheritIO(); // Redirigir entrada/salida al terminal actual
+            
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            
+            System.out.println("\n=== Ejecución finalizada con código: " + exitCode + " ===");
+            
+        } catch (java.io.IOException e) {
+            System.err.println("Error: 'lli' no encontrado. Asegúrate de tener LLVM instalado.");
+        } catch (InterruptedException e) {
+            System.err.println("Ejecución interrumpida: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
+    }
+    
+    public void optimizarLLVM() {
+        String filename = sourceFileName.replace(".tri", ".ll");
+        
+        try {
+            // Ejecutar: opt -O3 -S input.ll -o output_opt.ll
+            Process process = new ProcessBuilder("opt", "-O3", "-S", filename, "-o", filename).start();
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode == 0) {
+                System.out.println("LLVM IR optimized successfully: " + filename);
+            } else {
+                System.err.println("LLVM optimization failed with exit code: " + exitCode);
+            }
+            
+        } catch (java.io.IOException e) {
+            System.err.println("Error: 'opt' not found.");
+        } catch (InterruptedException e) {
+            System.err.println("Optimization interrupted: " + e.getMessage());
+            Thread.currentThread().interrupt();
+        }
+    }
 
     @Override
     public Object visitAssignCommand(AssignCommand ast, Object o) {
         // Evaluar la expresión del lado derecho
-        Object rhsResult = ast.E.visit(this, null);
+        String value = (String) ast.E.visit(this, null);
         
-        // Obtener el puntero del lado izquierdo
-        String lhs = (String) ast.V.visit(this, o);
+        // Obtener el nombre de la variable del lado izquierdo
+        String varName = getVnameIdentifier(ast.V);
         
-        // Determinar el tipo de la variable
-        String varType;
-        if (ast.V.type instanceof RecordTypeDenoter) {
-            if (typeDenoterToStructName.containsKey(ast.V.type)) {
-                String typeName = typeDenoterToStructName.get(ast.V.type);
-                varType = "%struct." + typeName;
-            } else {
-                varType = "i32"; // fallback
-            }
+        // Almacenar el valor en la variable (puede ser @ o %)
+        if (varMap.containsKey(varName)) {
+            String varPtr = varMap.get(varName);
+            emit("store i32 " + value + ", ptr " + varPtr + ", align 4");
         } else {
-            varType = getLLVMType(ast.V.type);
-        }
-        
-        // Manejar asignación de records/arrays con múltiples elementos (ArrayList)
-        if (rhsResult instanceof java.util.ArrayList) {
-            java.util.ArrayList<String> elements = (java.util.ArrayList<String>) rhsResult;
-            
-            // Determinar si es array o record
-            boolean isArray = ast.V.type instanceof ArrayTypeDenoter;
-            
-            // Asignar cada elemento/campo individualmente
-            for (int i = 0; i < elements.size(); i++) {
-                String element = elements.get(i);
-                // Parsear "tipo valor" del elemento
-                String[] parts = element.split(" ", 2);
-                if (parts.length == 2) {
-                    String elemType = parts[0];
-                    String elemValue = parts[1];
-                    
-                    // Obtener puntero al elemento/campo i
-                    String elemPtr = newTemp();
-                    if (isArray) {
-                        // Para arrays: usar i64 para el índice
-                        emit(elemPtr + " = getelementptr inbounds " + varType + ", ptr " + lhs + ", i64 0, i64 " + i);
-                    } else {
-                        // Para records: usar i32 para el índice de campo
-                        emit(elemPtr + " = getelementptr inbounds " + varType + ", ptr " + lhs + ", i32 0, i32 " + i);
-                    }
-                    
-                    // Almacenar el valor en el elemento/campo
-                    emit("store " + elemType + " " + elemValue + ", ptr " + elemPtr + ", align 4");
-                }
-            }
-        } else {
-            // Asignación simple (no record)
-            String rhs = (String) rhsResult;
-            if (varType == null) varType = "i32";
-            emit("store " + varType + " " + rhs + ", ptr " + lhs + ", align 4");
+            throw new RuntimeException("Variable not found: " + varName);
         }
         
         return null;
@@ -433,23 +437,17 @@ public class LLVM implements Visitor {
     @Override
     public Object visitArrayExpression(ArrayExpression ast, Object o) {
         // Array literal expression: [e1, e2, e3, ...]
-        // Basado en LLVMGenerator: retorna ArrayList de elementos
+        // En Triangle, las expresiones de array crean arrays literales
+        // Esto requiere:
+        // 1. Determinar el tamaño del array
+        // 2. Alocar memoria para el array
+        // 3. Inicializar cada elemento
         
-        // Verificar si estamos en contexto constante
-        boolean isConst = o instanceof Boolean && (Boolean) o;
-        
-        // Recolectar los elementos del array
-        java.util.ArrayList<String> elems = new java.util.ArrayList<>();
-        ast.AA.visit(this, elems);
-        
-        // Si es constante, retornar la lista de elementos
-        if (isConst) {
-            return elems;
-        } else {
-            // Para arrays no constantes, retornar la lista también
-            // El contexto decidirá cómo usarla
-            return elems;
-        }
+        // Por ahora, esta característica no está completamente soportada
+        // porque requiere tracking de tipos de array y manejo dinámico de memoria
+        throw new UnsupportedOperationException(
+            "No es posible"
+        );
     }
 
     @Override
@@ -661,12 +659,19 @@ public class LLVM implements Visitor {
     @Override
     public Object visitRecordExpression(RecordExpression ast, Object o) {
         // Record literal expression: {field1 is value1, field2 is value2, ...}
-        // Visitar el record aggregate para obtener los valores de los campos
-        java.util.ArrayList<String> elements = new java.util.ArrayList<>();
-        ast.RA.visit(this, elements);
+        // En Triangle, las expresiones de record crean estructuras literales
+        // Esto requiere:
+        // 1. Definir el tipo struct en LLVM
+        // 2. Alocar memoria para el record
+        // 3. Inicializar cada campo con su valor
+        // 4. Manejar el acceso a campos con getelementptr
         
-        // Retornar la lista de elementos (tipo valor)
-        return elements;
+        // Por ahora, esta característica no está completamente soportada
+        // porque requiere tracking de tipos de record, definición de structs,
+        // y manejo complejo de layouts de memoria
+        throw new UnsupportedOperationException(
+            "No es posible"
+        );
     }
 
     @Override
@@ -697,36 +702,8 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitVnameExpression(VnameExpression ast, Object o) {
-        // Para SimpleVname de variables simples (no arrays/records), 
-        // el visitor ya hace load automáticamente
-        if (ast.V instanceof SimpleVname) {
-            SimpleVname sv = (SimpleVname) ast.V;
-            String varName = sv.I.spelling;
-            
-            // Si es una constante inline, retornarla directamente
-            if (varMap.containsKey(varName)) {
-                String varPtr = varMap.get(varName);
-                // Si no empieza con % o @, es una constante inline
-                if (!varPtr.startsWith("%") && !varPtr.startsWith("@")) {
-                    return varPtr;
-                }
-            }
-        }
-        
-        // Visitar el Vname para obtener el puntero o valor
-        String var = (String) ast.V.visit(this, o);
-        
-        // Para SubscriptVname o DotVname, ya tenemos un puntero al elemento/campo
-        // Necesitamos hacer load para obtener el valor
-        if (ast.V instanceof SubscriptVname || ast.V instanceof DotVname) {
-            String varType = getLLVMType(ast.V.type);
-            String tmp = newTemp();
-            emit(tmp + " = load " + varType + ", ptr " + var + ", align 4");
-            return tmp;
-        }
-        
-        // Para SimpleVname, el visitor ya hizo load si era necesario
-        return var;
+        // Visitar el Vname para obtener su valor
+        return ast.V.visit(this, null);
     }
 
     @Override
@@ -885,28 +862,6 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitTypeDeclaration(TypeDeclaration ast, Object o) {
-        // Declaración de tipo: type Name ~ RecordType
-        if (ast.T instanceof RecordTypeDenoter) {
-            String typeName = ast.I.spelling;
-            String structName = typeName;
-            
-            // Generar la definición del struct type
-            String fieldTypes = (String) ast.T.visit(this, null);
-            
-            // Emitir la definición del struct en la sección de globals
-            globals.append("%struct.").append(structName)
-                   .append(" = type { ")
-                   .append(fieldTypes)
-                   .append(" }\n");
-            
-            // Construir el mapa de índices de campos
-            java.util.Map<String, Integer> fieldMap = new java.util.HashMap<>();
-            buildFieldIndexMap(((RecordTypeDenoter) ast.T).FT, fieldMap, 0);
-            structFieldIndices.put(structName, fieldMap);
-            
-            // Guardar la asociación TypeDenoter -> struct name
-            typeDenoterToStructName.put(ast.T, structName);
-        }
         return null;
     }
 
@@ -920,14 +875,6 @@ public class LLVM implements Visitor {
         String varName = ast.I.spelling;
         String llvmType = getLLVMType(ast.T);
         
-        // Si es un record type, guardar el tipo struct asociado
-        if (ast.T instanceof RecordTypeDenoter) {
-            if (typeDenoterToStructName.containsKey(ast.T)) {
-                String structName = typeDenoterToStructName.get(ast.T);
-                varStructTypes.put(varName, "%struct." + structName);
-            }
-        }
-        
         // Usar @ para variables globales en Triangle
         String varPtr = "@" + varName;
         
@@ -935,7 +882,7 @@ public class LLVM implements Visitor {
         globals.append(varPtr)
               .append(" = dso_local global ")
               .append(llvmType)
-              .append(" zeroinitializer, align 8\n");
+              .append(" 0, align 4\n");
         
         // Guardar en varMap para referencias posteriores
         varMap.put(varName, varPtr);
@@ -945,96 +892,22 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitMultipleArrayAggregate(MultipleArrayAggregate ast, Object o) {
-        // Múltiples elementos en un array aggregate: e1, e2, e3, ...
-        java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-        
-        // Verificar si estamos en contexto constante
-        boolean isConst = (o instanceof Boolean && (Boolean) o);
-        
-        // Obtener el tipo del elemento
-        String type = getLLVMType(ast.E.type);
-        
-        // Evaluar la expresión del elemento
-        Object valueResult = ast.E.visit(this, isConst);
-        
-        String value;
-        if (valueResult instanceof java.util.ArrayList) {
-            // Si el elemento es un array o record anidado
-            java.util.ArrayList<String> nestedElems = (java.util.ArrayList<String>) valueResult;
-            value = "{ " + String.join(", ", nestedElems) + " }";
-        } else {
-            value = (String) valueResult;
-        }
-        
-        // Agregar "tipo valor" a la lista
-        elements.add(type + " " + value);
-        
-        // Visitar el resto de los elementos
-        ast.AA.visit(this, o);
-        
-        return null;
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitSingleArrayAggregate(SingleArrayAggregate ast, Object o) {
-        // Un solo elemento en un array aggregate
-        java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-        
-        // Verificar si estamos en contexto constante
-        boolean isConst = (o instanceof Boolean && (Boolean) o);
-        
-        // Obtener el tipo del elemento
-        String type = getLLVMType(ast.E.type);
-        
-        // Evaluar la expresión del elemento
-        Object valueResult = ast.E.visit(this, isConst);
-        
-        String value;
-        if (valueResult instanceof java.util.ArrayList) {
-            // Si el elemento es un array o record anidado
-            java.util.ArrayList<String> nestedElems = (java.util.ArrayList<String>) valueResult;
-            value = "{ " + String.join(", ", nestedElems) + " }";
-        } else {
-            value = (String) valueResult;
-        }
-        
-        // Agregar "tipo valor" a la lista
-        elements.add(type + " " + value);
-        
-        return null;
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitMultipleRecordAggregate(MultipleRecordAggregate ast, Object o) {
-        // Múltiples campos en un record aggregate: field1 is expr1, field2 is expr2, ...
-        java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-        
-        // Evaluar la expresión de este campo
-        String value = (String) ast.E.visit(this, null);
-        String type = getLLVMType(ast.E.type);
-        
-        // Agregar "tipo valor" a la lista
-        elements.add(type + " " + value);
-        
-        // Visitar el resto de los campos
-        ast.RA.visit(this, elements);
-        
-        return null;
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitSingleRecordAggregate(SingleRecordAggregate ast, Object o) {
-        // Un solo campo en un record aggregate: field is expr
-        java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-        
-        // Evaluar la expresión de este campo
-        String value = (String) ast.E.visit(this, null);
-        String type = getLLVMType(ast.E.type);
-        
-        // Agregar "tipo valor" a la lista
-        elements.add(type + " " + value);
-        
-        return null;
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
@@ -1212,12 +1085,14 @@ public class LLVM implements Visitor {
     public Object visitVarActualParameter(VarActualParameter ast, Object o) {
         // Parámetro actual variable (pasa la dirección)
         StringBuilder args = (StringBuilder) o;
+        String varName = getVnameIdentifier(ast.V);
         
-        // Visitar el Vname para obtener su puntero (no hacemos load)
-        String varPtr = (String) ast.V.visit(this, o);
-        
-        args.append("ptr ").append(varPtr);
-        
+        if (varMap.containsKey(varName)) {
+            String varPtr = varMap.get(varName);
+            args.append("ptr ").append(varPtr);
+        } else {
+            throw new RuntimeException("Variable not found: " + varName);
+        }
         return null;
     }
 
@@ -1256,88 +1131,52 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitAnyTypeDenoter(AnyTypeDenoter ast, Object o) {
-        // AnyTypeDenoter se usa para errores de tipo o tipos desconocidos
-        // Por defecto retornamos i32 (entero de 32 bits)
-        return "i32";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitArrayTypeDenoter(ArrayTypeDenoter ast, Object o) {
-        // ArrayTypeDenoter representa un tipo array: array N of T
-        // En LLVM: [N x tipo_elemento]
-        // Ejemplo: array 10 of Integer -> [10 x i32]
-        int size = Integer.parseInt(ast.IL.spelling);
-        String elementType = (String) ast.T.visit(this, o);
-        return "[" + size + " x " + elementType + "]";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitBoolTypeDenoter(BoolTypeDenoter ast, Object o) {
-        // Boolean se representa como i1 en LLVM (1 bit)
-        return "i1";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitCharTypeDenoter(CharTypeDenoter ast, Object o) {
-        // Char se representa como i8 en LLVM (8 bits = 1 byte)
-        return "i8";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitErrorTypeDenoter(ErrorTypeDenoter ast, Object o) {
-        // ErrorTypeDenoter indica un error en el análisis de tipos
-        // Por defecto retornamos i32 para evitar errores en cascada
-        return "i32";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitSimpleTypeDenoter(SimpleTypeDenoter ast, Object o) {
-        // SimpleTypeDenoter es una referencia a un tipo por nombre
-        // Mapear nombres de tipos Triangle a tipos LLVM
-        String typeName = ast.I.spelling;
-        switch (typeName) {
-            case "Integer":
-                return "i32";
-            case "Char":
-                return "i8";
-            case "Boolean":
-                return "i1";
-            default:
-                // Para tipos definidos por el usuario, retornar i32 por defecto
-                return "i32";
-        }
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitIntTypeDenoter(IntTypeDenoter ast, Object o) {
-        // Integer se representa como i32 en LLVM (32 bits)
-        return "i32";
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitRecordTypeDenoter(RecordTypeDenoter ast, Object o) {
-        // RecordTypeDenoter representa un tipo record (estructura)
-        // En LLVM sería un struct type, pero requiere manejo complejo
-        // Por ahora, visitamos los campos para obtener sus tipos
-        // Formato: tipo1, tipo2, tipo3, ...
-        return ast.FT.visit(this, o);
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitMultipleFieldTypeDenoter(MultipleFieldTypeDenoter ast, Object o) {
-        // MultipleFieldTypeDenoter representa múltiples campos en un record
-        // Formato: field1: Type1, field2: Type2, ...
-        // Retornamos una lista de tipos separados por comas
-        String leftType = (String) ast.T.visit(this, o);
-        String rightTypes = (String) ast.FT.visit(this, o);
-        return leftType + ", " + rightTypes;
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
     public Object visitSingleFieldTypeDenoter(SingleFieldTypeDenoter ast, Object o) {
-        // SingleFieldTypeDenoter representa un solo campo en un record
-        // Retornamos el tipo del campo
-        return (String) ast.T.visit(this, o);
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     @Override
@@ -1363,45 +1202,26 @@ public class LLVM implements Visitor {
     @Override
     public Object visitDotVname(DotVname ast, Object o) {
         // Record field access: record.field
-        // En LLVM esto requiere usar getelementptr para obtener la dirección del campo
+        // En Triangle, esto se usa para acceder a campos de una estructura record
+        // Sintaxis: recordVariable.fieldName
         
-        // Obtener el puntero base del record
-        String basePtr = (String) ast.V.visit(this, o);
+        // Para implementar esto completamente en LLVM se requiere:
+        // 1. Definir tipos struct para cada tipo record
+        // 2. Mantener un mapa de tipos record a sus definiciones struct
+        // 3. Rastrear los índices de campos dentro de cada struct
+        // 4. Usar getelementptr para calcular la dirección del campo
+        // 5. Hacer load/store del campo según el contexto
         
-        // Obtener el nombre base de la variable (para buscar su tipo struct)
-        String baseName = null;
-        if (ast.V instanceof SimpleVname) {
-            baseName = ((SimpleVname) ast.V).I.spelling;
-        }
+        // Ejemplo de código LLVM para acceso a campo:
+        // %fieldPtr = getelementptr %RecordType, ptr %recordPtr, i32 0, i32 fieldIndex
+        // %fieldValue = load i32, ptr %fieldPtr, align 4
         
-        // Determinar el tipo struct
-        String structType = null;
-        if (baseName != null && varStructTypes.containsKey(baseName)) {
-            structType = varStructTypes.get(baseName);
-        } else if (ast.V.type instanceof RecordTypeDenoter) {
-            if (typeDenoterToStructName.containsKey(ast.V.type)) {
-                String structName = typeDenoterToStructName.get(ast.V.type);
-                structType = "%struct." + structName;
-            }
-        }
-        
-        if (structType == null) {
-            throw new RuntimeException("Cannot determine struct type for field access: " + ast.I.spelling);
-        }
-        
-        // Obtener el índice del campo
-        String structName = structType.replace("%struct.", "");
-        java.util.Map<String, Integer> fieldMap = structFieldIndices.get(structName);
-        int fieldIndex = 0;
-        if (fieldMap != null && fieldMap.containsKey(ast.I.spelling)) {
-            fieldIndex = fieldMap.get(ast.I.spelling);
-        }
-        
-        // Generar la instrucción getelementptr para acceder al campo
-        String fieldPtr = newTemp();
-        emit(fieldPtr + " = getelementptr inbounds " + structType + ", ptr " + basePtr + ", i32 0, i32 " + fieldIndex);
-        
-        return fieldPtr;
+        throw new UnsupportedOperationException(
+            "Record field access (DotVname) is not supported. " +
+            "Record types require struct type definitions, field index tracking, " +
+            "and getelementptr instructions for field access. " +
+            "Consider using simpler data structures or implement full record support."
+        );
     }
 
     @Override
@@ -1412,14 +1232,8 @@ public class LLVM implements Visitor {
         if (varMap.containsKey(varName)) {
             String varPtr = varMap.get(varName);
             
-            // Si empieza con % o @, es un puntero
+            // Si empieza con % o @, es un puntero y necesitamos hacer load
             if (varPtr.startsWith("%") || varPtr.startsWith("@")) {
-                // Para records/structs y arrays, simplemente retornar el puntero
-                // El contexto (VnameExpression, AssignCommand, SubscriptVname) decidirá si hacer load
-                if (ast.type instanceof RecordTypeDenoter || ast.type instanceof ArrayTypeDenoter) {
-                    return varPtr;
-                }
-                
                 // Si es un parámetro por valor (no empieza con %result), usar directamente
                 if (varPtr.startsWith("%") && !varPtr.contains("result") && !varPtr.startsWith("%t")) {
                     // Es un parámetro formal, usar directamente

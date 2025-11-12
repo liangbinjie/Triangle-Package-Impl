@@ -219,16 +219,25 @@
               <Properties>
                 <Property name="text" type="java.lang.String" value="Save LLVM code"/>
               </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="saveLLVMmenuActionPerformed"/>
+              </Events>
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="executeLLVMmenu">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Execute LLVM"/>
               </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="executeLLVMmenuActionPerformed"/>
+              </Events>
             </MenuItem>
             <MenuItem class="javax.swing.JMenuItem" name="optimizeLLVMmenu">
               <Properties>
                 <Property name="text" type="java.lang.String" value="Optimize LLVM"/>
               </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="optimizeLLVMmenuActionPerformed"/>
+              </Events>
             </MenuItem>
           </SubComponents>
         </Menu>

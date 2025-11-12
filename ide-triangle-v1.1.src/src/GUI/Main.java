@@ -22,15 +22,12 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.MouseListener;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.FileWriter;
 import javax.swing.ImageIcon;
-import java.awt.Image;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
-import javax.swing.LookAndFeel;
 import javax.swing.UIManager;
 import Triangle.IDECompiler;
 import Core.ExampleFileFilter;
@@ -507,12 +504,27 @@ public class Main extends javax.swing.JFrame {
         jMenu1.add(viewLLVMmenu);
 
         saveLLVMmenu.setText("Save LLVM code");
+        saveLLVMmenu.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveLLVMmenuActionPerformed(evt);
+            }
+        });
         jMenu1.add(saveLLVMmenu);
 
         executeLLVMmenu.setText("Execute LLVM");
+        executeLLVMmenu.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                executeLLVMmenuActionPerformed(evt);
+            }
+        });
         jMenu1.add(executeLLVMmenu);
 
         optimizeLLVMmenu.setText("Optimize LLVM");
+        optimizeLLVMmenu.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                optimizeLLVMmenuActionPerformed(evt);
+            }
+        });
         jMenu1.add(optimizeLLVMmenu);
 
         menuBar.add(jMenu1);
@@ -703,8 +715,77 @@ public class Main extends javax.swing.JFrame {
     }//GEN-LAST:event_exitMenuItemActionPerformed
 
     private void viewLLVMmenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_viewLLVMmenuActionPerformed
-        // TODO add your handling code here:
+        // Generar y mostrar el código LLVM en la consola
+        String fileName = ((FileFrame)desktopPane.getSelectedFrame()).getTitle();
+        
+        // Verificar que el programa esté compilado primero
+        if (compiler.getAST() == null) {
+            JOptionPane.showMessageDialog(this, 
+                "Please compile the Triangle program first (F5)", 
+                "No AST Available", 
+                JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        // Seleccionar y limpiar la consola
+        ((FileFrame)desktopPane.getSelectedFrame()).selectConsole();
+        ((FileFrame)desktopPane.getSelectedFrame()).clearConsole();
+        
+        // Redirigir la salida a la consola del IDE
+        output.setDelegate(delegateConsole);
+        
+        // Generar el código LLVM (esto imprimirá el código en la consola)
+        compiler.generarLLVM(fileName);
     }//GEN-LAST:event_viewLLVMmenuActionPerformed
+
+    private void saveLLVMmenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveLLVMmenuActionPerformed
+        String fileName = ((FileFrame)desktopPane.getSelectedFrame()).getTitle();
+        
+        // Verificar que el programa esté compilado primero
+        if (compiler.getAST() == null) {
+            System.out.println("Compilar el codigo (F5)");
+            return;
+        }
+        
+        ((FileFrame)desktopPane.getSelectedFrame()).setTree((DefaultMutableTreeNode)treeVisitor.visitProgram(compiler.getAST(), null));
+        
+        // Primero generar el código LLVM
+        compiler.generarLLVM(fileName);
+        // Luego guardarlo (ahora reutiliza la misma instancia)
+        compiler.guardarLLVM(fileName);
+    }//GEN-LAST:event_saveLLVMmenuActionPerformed
+
+    private void executeLLVMmenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_executeLLVMmenuActionPerformed
+        // TODO add your handling code here:
+        String fileName = ((FileFrame)desktopPane.getSelectedFrame()).getTitle();
+        
+        // Verificar que el programa esté compilado primero
+        if (compiler.getAST() == null) {
+            System.out.println("Compilar el codigo (F5)");
+            return;
+        }
+        
+        ((FileFrame)desktopPane.getSelectedFrame()).setTree((DefaultMutableTreeNode)treeVisitor.visitProgram(compiler.getAST(), null));
+        
+        // Primero generar el código LLVM
+        compiler.ejecutarLLVM();
+    }//GEN-LAST:event_executeLLVMmenuActionPerformed
+
+    private void optimizeLLVMmenuActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_optimizeLLVMmenuActionPerformed
+        // TODO add your handling code here:
+        String fileName = ((FileFrame)desktopPane.getSelectedFrame()).getTitle();
+        
+        // Verificar que el programa esté compilado primero
+        if (compiler.getAST() == null) {
+            System.out.println("Compilar el codigo (F5)");
+            return;
+        }
+        
+        ((FileFrame)desktopPane.getSelectedFrame()).setTree((DefaultMutableTreeNode)treeVisitor.visitProgram(compiler.getAST(), null));
+        
+        // Primero generar el código LLVM
+        compiler.optimizarLLVM();
+    }//GEN-LAST:event_optimizeLLVMmenuActionPerformed
 
     // </editor-fold>    
            
