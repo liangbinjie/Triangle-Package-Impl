@@ -156,10 +156,13 @@ public class LLVM implements Visitor {
         // Declarar printf para putint y putchar para put
         header.append("; External function declarations\n");
         header.append("declare i32 @printf(ptr, ...)\n");
-        header.append("declare i32 @putchar(i32)\n\n");
+        header.append("declare i32 @putchar(i32)\n");
+        header.append("declare i32 @scanf(ptr, ...)\n");
+        header.append("declare i32 @getchar()\n\n");
         
-        // Definir el formato string para putint
+        // Definir el formato string para putint y getint
         globals.append("@.str.putint = private unnamed_addr constant [4 x i8] c\"%d\\0A\\00\", align 1\n");
+        globals.append("@.str.getint = private unnamed_addr constant [3 x i8] c\"%d\\00\", align 1\n");
     }
     
     public void generarLLVM(Program theAST) {
@@ -297,6 +300,41 @@ public class LLVM implements Visitor {
                 // charValue ya es el valor ASCII como i32 (de visitCharacterExpression)
                 String temp = newTemp();
                 emit(temp + " = call i32 @putchar(i32 " + charValue + ")");
+            }
+            return null;
+        }
+        
+        if (procName.equals("getint")) {
+            // getint(var x) lee un entero desde stdin
+            if (ast.APS != null) {
+                // El parámetro debe ser una variable (var parameter)
+                // Obtener el puntero de la variable del parámetro actual
+                StringBuilder args = new StringBuilder();
+                ast.APS.visit(this, args);
+                
+                // Llamar a scanf con el formato y el puntero a la variable
+                String temp = newTemp();
+                emit(temp + " = call i32 (ptr, ...) @scanf(ptr @.str.getint, " + args.toString() + ")");
+            }
+            return null;
+        }
+        
+        if (procName.equals("get")) {
+            // get(var c) lee un carácter desde stdin
+            if (ast.APS != null) {
+                // Llamar a getchar() que retorna el carácter como i32
+                String charValue = newTemp();
+                emit(charValue + " = call i32 @getchar()");
+                
+                // Obtener el puntero de la variable del parámetro actual
+                StringBuilder args = new StringBuilder();
+                ast.APS.visit(this, args);
+                
+                // Extraer solo el puntero (quitar "ptr " del inicio)
+                String varPtr = args.toString().replace("ptr ", "");
+                
+                // Almacenar el carácter en la variable (como i32)
+                emit("store i32 " + charValue + ", ptr " + varPtr + ", align 4");
             }
             return null;
         }

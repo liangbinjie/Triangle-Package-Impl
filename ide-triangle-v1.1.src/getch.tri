@@ -1,0 +1,7 @@
+let 
+var c: Char
+in
+  begin
+    get(var c);
+    put(c)
+  end

@@ -1,0 +1,7 @@
+let 
+var n: Integer
+in
+  begin
+    getint(var n);
+    putint(n)
+  end
