@@ -1,0 +1,14 @@
+
+
+let
+type Person ~ record
+  age: Integer,
+  initial: Char
+end;
+  var p: Person
+in
+  begin
+    p.age := 25;
+    p.initial := 'J';
+    putint(p.age)
+  end
