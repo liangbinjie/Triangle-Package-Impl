@@ -15,6 +15,7 @@ import Triangle.AbstractSyntaxTrees.Program;
 import Triangle.SyntacticAnalyzer.Parser;
 import Triangle.ContextualAnalyzer.Checker;
 import Triangle.CodeGenerator.Encoder;
+import Triangle.LLVM.LLVM;
 
 
 
@@ -66,6 +67,10 @@ public class IDECompiler {
                 if (report.numErrors == 0) {
                     encoder.saveObjectProgram(sourceName.replace(".tri", ".tam"));
                     success = true;
+                    
+                    LLVM llvmer = new LLVM(sourceName);
+                    llvmer.generarLLVM(rootAST);
+                    System.out.println("LLVM Code generated");
                 }
             }
         }

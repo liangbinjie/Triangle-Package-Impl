@@ -1,0 +1,16 @@
+! Test de declaraciones en Triangle
+! Prueba variables, constantes y tipos
+
+let
+  const MAX ~ 100;
+  const MIN ~ 10;
+  
+  var x: Integer;
+  var y: Integer;
+  var result: Integer
+in
+  begin
+    x := MAX;
+    y := MIN;
+    result := x - y
+  end

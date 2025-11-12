@@ -1,0 +1,6 @@
+let
+    var n: Integer
+in
+begin
+n := 5
+end

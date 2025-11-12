@@ -2,6 +2,11 @@
 <project-private xmlns="http://www.netbeans.org/ns/project-private/1">
     <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
     <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
-        <group/>
+        <group>
+            <file>file:/home/benji/TEC/2025/Compi/Triangle-Package-Impl/Triangle/src/Triangle/LLVM/LLVM.java</file>
+            <file>file:/home/benji/TEC/2025/Compi/Triangle-Package-Impl/Triangle/src/Triangle/LLVM/LLVM2.java</file>
+            <file>file:/home/benji/TEC/2025/Compi/Triangle-Package-Impl/Triangle/src/Triangle/Compiler.java</file>
+            <file>file:/home/benji/TEC/2025/Compi/Triangle-Package-Impl/Triangle/src/Triangle/CodeGenerator/Encoder.java</file>
+        </group>
     </open-files>
 </project-private>

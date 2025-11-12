@@ -24,6 +24,7 @@ import Triangle.SyntacticAnalyzer.Parser;
 import Triangle.SyntacticAnalyzer.Scanner;
 import Triangle.SyntacticAnalyzer.SourceFile;
 import Triangle.TreeDrawer.Drawer;
+import Triangle.LLVM.LLVM;
 
 /**
  * The main driver class for the Triangle compiler.
@@ -42,6 +43,7 @@ public class Compiler {
     private static Encoder encoder;
     private static ErrorReporter reporter;
     private static Drawer drawer;
+    private static LLVM llvmer;
 
     /** The AST representing the source program. */
     private static Program theAST;
@@ -82,6 +84,7 @@ public class Compiler {
         parser   = new Parser(scanner, reporter);
         checker  = new Checker(reporter);
         encoder  = new Encoder(reporter);
+        llvmer     = new LLVM(sourceName);
         drawer   = new Drawer();
 
         // scanner.enableDebugging();
@@ -98,6 +101,8 @@ public class Compiler {
             if (reporter.numErrors == 0) {
                 System.out.println("Code Generation ...");
                 encoder.encodeRun(theAST, showingTable);	// 3rd pass
+                
+                llvmer.generarLLVM(theAST);
             }
         }
 

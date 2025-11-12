@@ -202,6 +202,36 @@
             </MenuItem>
           </SubComponents>
         </Menu>
+        <Menu class="javax.swing.JMenu" name="jMenu1">
+          <Properties>
+            <Property name="text" type="java.lang.String" value="LLVM"/>
+          </Properties>
+          <SubComponents>
+            <MenuItem class="javax.swing.JMenuItem" name="viewLLVMmenu">
+              <Properties>
+                <Property name="text" type="java.lang.String" value=" View LLVM code"/>
+              </Properties>
+              <Events>
+                <EventHandler event="actionPerformed" listener="java.awt.event.ActionListener" parameters="java.awt.event.ActionEvent" handler="viewLLVMmenuActionPerformed"/>
+              </Events>
+            </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="saveLLVMmenu">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Save LLVM code"/>
+              </Properties>
+            </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="executeLLVMmenu">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Execute LLVM"/>
+              </Properties>
+            </MenuItem>
+            <MenuItem class="javax.swing.JMenuItem" name="optimizeLLVMmenu">
+              <Properties>
+                <Property name="text" type="java.lang.String" value="Optimize LLVM"/>
+              </Properties>
+            </MenuItem>
+          </SubComponents>
+        </Menu>
       </SubComponents>
     </Menu>
   </NonVisualComponents>
