@@ -264,7 +264,7 @@ public class LLVM implements Visitor {
             varType = (String) ast.V.type.visit(this, o);
         }
         
-        // Si el resultado es un ArrayList (asignación de record literal)
+        // Si el resultado es un ArrayList (asignación de record o array literal)
         if (rhsResult instanceof java.util.ArrayList) {
             java.util.ArrayList<String> elements = (java.util.ArrayList<String>) rhsResult;
             for (int i = 0; i < elements.size(); i++) {
@@ -274,11 +274,16 @@ public class LLVM implements Visitor {
                 String elemType = parts[0];
                 String elemValue = parts[1];
                 
-                // Generar puntero al campo
-                String fieldPtr = newTemp();
-                emit(fieldPtr + " = getelementptr inbounds " + varType + ", ptr " + lhs + ", i32 0, i32 " + i);
+                // Generar puntero al elemento (campo para records, índice para arrays)
+                String fieldPtr;
+                if (i == 0) {
+                    fieldPtr = lhs;
+                } else {
+                    fieldPtr = newTemp();
+                    emit(fieldPtr + " = getelementptr inbounds " + varType + ", ptr " + lhs + ", i32 0, i32 " + i);
+                }
                 
-                // Almacenar el valor en el campo
+                // Almacenar el valor en el elemento
                 emit("store " + elemType + " " + elemValue + ", ptr " + fieldPtr + ", align 4");
             }
         } else {
@@ -503,16 +508,11 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitArrayExpression(ArrayExpression ast, Object o) {
-        boolean isConst = o instanceof Boolean && (Boolean) o;
-        
-        java.util.ArrayList<String> elems = new java.util.ArrayList<>();
-        ast.AA.visit(this, elems);
-        
-        if (isConst) {
-            return elems;
-        } else {
-            return elems;
-        }
+        // Array literal expression: [e1, e2, e3, ...]
+        // Retornar un ArrayList de elementos en formato "tipo valor"
+        java.util.ArrayList<String> elements = new java.util.ArrayList<>();
+        ast.AA.visit(this, elements);
+        return elements;
     }
 
     @Override
@@ -758,13 +758,13 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitVnameExpression(VnameExpression ast, Object o) {
-        // Para SimpleVname con parámetros const, retornar directamente
+        // Para SimpleVname, verificar si es un parámetro const en funciones
         if (ast.V instanceof SimpleVname) {
             String varName = ((SimpleVname) ast.V).I.spelling;
             if (varMap.containsKey(varName)) {
                 String varPtr = varMap.get(varName);
-                // Si es un parámetro por valor (no es puntero temporal ni resultado)
-                if (varPtr.startsWith("%") && !varPtr.contains("result") && !varPtr.startsWith("%t")) {
+                // Si es un parámetro por valor en función (no es puntero temporal)
+                if (varPtr.startsWith("%") && !varPtr.contains("result") && !varPtr.startsWith("%t") && currentFunction != null) {
                     return varPtr;
                 }
             }
@@ -803,27 +803,12 @@ public class LLVM implements Visitor {
         // const name = expression
         String constName = ast.I.spelling;
         
-        // Determinar si es una constante local o global
-        boolean isLocal = (currentFunction != null) || (main.length() > 0);
+        // Evaluar la expresión constante
+        String constValue = (String) ast.E.visit(this, null);
         
-        if (isLocal) {
-            // Constante local - alocar y almacenar
-            String varPtr = "%" + constName;
-            
-            String exprType = (String) ast.E.type.visit(this, o);
-            if (exprType == null) exprType = "i32";
-            
-            emit(varPtr + " = alloca " + exprType + ", align 4");
-            
-            String value = (String) ast.E.visit(this, null);
-            emit("store " + exprType + " " + value + ", ptr " + varPtr + ", align 4");
-            
-            varMap.put(constName, varPtr);
-        } else {
-            // Constante global - inline substitution
-            String constValue = (String) ast.E.visit(this, null);
-            varMap.put(constName, constValue);
-        }
+        // En LLVM, las constantes se pueden manejar con inline substitution
+        // Guardamos el valor directamente en varMap sin @ o %
+        varMap.put(constName, constValue);
         
         return null;
     }
@@ -993,41 +978,35 @@ public class LLVM implements Visitor {
         String varName = ast.I.spelling;
         String llvmType = getLLVMType(ast.T);
         
-        // Detectar si es una variable local (dentro de función/procedimiento) o global
-        boolean isLocal = (currentFunction != null) || (main.length() > 0 && !globals.toString().isEmpty());
+        // SIEMPRE usar @ para variables globales (dentro de let en el programa principal)
+        String varPtr = "@" + varName;
         
-        if (isLocal) {
-            // Variable local - usar alloca
-            String varPtr = "%" + varName;
-            emit(varPtr + " = alloca " + llvmType + ", align 4");
-            varMap.put(varName, varPtr);
-            
-            // Si es un tipo Record, guardar el mapping de tipo
-            if (ast.T instanceof RecordTypeDenoter) {
-                String structType = typeDenoterToStructName.get(ast.T);
-                if (structType != null) {
-                    varStructTypes.put(varName, "%struct." + structType);
-                }
-            }
+        // Determinar el valor inicial según el tipo
+        String initialValue;
+        if (llvmType.startsWith("%struct.") || llvmType.startsWith("[")) {
+            // Para structs y arrays usar zeroinitializer
+            initialValue = "zeroinitializer";
         } else {
-            // Variable global - usar @ 
-            String varPtr = "@" + varName;
-            
-            // Declarar como variable global
-            globals.append(varPtr)
-                  .append(" = dso_local global ")
-                  .append(llvmType)
-                  .append(" 0, align 4\n");
-            
-            // Guardar en varMap para referencias posteriores
-            varMap.put(varName, varPtr);
-            
-            // Si es un tipo Record, guardar el mapping de tipo
-            if (ast.T instanceof RecordTypeDenoter) {
-                String structType = typeDenoterToStructName.get(ast.T);
-                if (structType != null) {
-                    varStructTypes.put(varName, "%struct." + structType);
-                }
+            // Para tipos primitivos usar 0
+            initialValue = "0";
+        }
+        
+        // Declarar como variable global
+        globals.append(varPtr)
+              .append(" = dso_local global ")
+              .append(llvmType)
+              .append(" ")
+              .append(initialValue)
+              .append(", align 4\n");
+        
+        // Guardar en varMap para referencias posteriores
+        varMap.put(varName, varPtr);
+        
+        // Si es un tipo Record, guardar el mapping de tipo
+        if (ast.T instanceof RecordTypeDenoter) {
+            String structType = typeDenoterToStructName.get(ast.T);
+            if (structType != null) {
+                varStructTypes.put(varName, "%struct." + structType);
             }
         }
         
@@ -1037,18 +1016,18 @@ public class LLVM implements Visitor {
     @Override
     public Object visitMultipleArrayAggregate(MultipleArrayAggregate ast, Object o) {
         java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-
-        boolean isConst = (o instanceof Boolean && (Boolean) o);
-        String type = (String) ast.E.type.visit(this, isConst);
-        Object valueResult = ast.E.visit(this, isConst);
+        
+        String type = (String) ast.E.type.visit(this, null);
+        Object valueResult = ast.E.visit(this, null);
         
         String value;
         if (valueResult instanceof java.util.ArrayList) {
-            value = "[" + String.join(", ", (java.util.ArrayList<String>) valueResult) + "]";
+            // Si es un record u otro agregado, convertir a string
+            value = valueResult.toString();
         } else {
             value = (String) valueResult;
         }
-
+        
         elements.add(type + " " + value);
         ast.AA.visit(this, o);
         
@@ -1058,18 +1037,18 @@ public class LLVM implements Visitor {
     @Override
     public Object visitSingleArrayAggregate(SingleArrayAggregate ast, Object o) {
         java.util.ArrayList<String> elements = (java.util.ArrayList<String>) o;
-
-        boolean isConst = (o instanceof Boolean && (Boolean) o);
-        String type = (String) ast.E.type.visit(this, isConst);
-        Object valueResult = ast.E.visit(this, isConst);
+        
+        String type = (String) ast.E.type.visit(this, null);
+        Object valueResult = ast.E.visit(this, null);
         
         String value;
         if (valueResult instanceof java.util.ArrayList) {
-            value = "[" + String.join(", ", (java.util.ArrayList<String>) valueResult) + "]";
+            // Si es un record u otro agregado, convertir a string
+            value = valueResult.toString();
         } else {
             value = (String) valueResult;
         }
-
+        
         elements.add(type + " " + value);
         return null;
     }
@@ -1098,23 +1077,10 @@ public class LLVM implements Visitor {
         // Parámetro formal constante: const name: Type
         StringBuilder params = (StringBuilder) o;
         String paramName = ast.I.spelling;
-        
-        String llvmType;
-        if (ast.T instanceof RecordTypeDenoter) {
-            String structName = typeDenoterToStructName.get(ast.T);
-            if (structName != null) {
-                llvmType = "%struct." + structName;
-            } else {
-                llvmType = getLLVMType(ast.T);
-            }
-        } else {
-            llvmType = getLLVMType(ast.T);
-        }
-        
-        String alloca = "%" + paramName + ".addr";
+        String paramType = getLLVMType(ast.T);
         
         // En LLVM, los parámetros se pasan por valor
-        params.append(llvmType).append(" %").append(paramName);
+        params.append(paramType).append(" %").append(paramName);
         
         // Guardar en varMap como referencia al parámetro
         varMap.put(paramName, "%" + paramName);
@@ -1194,14 +1160,6 @@ public class LLVM implements Visitor {
         
         // Guardar en varMap como puntero
         varMap.put(paramName, "%" + paramName);
-        
-        // Si es un tipo Record, guardar el mapping de tipo
-        if (ast.T instanceof RecordTypeDenoter) {
-            String structType = typeDenoterToStructName.get(ast.T);
-            if (structType != null) {
-                varStructTypes.put(paramName, "%struct." + structType);
-            }
-        }
         
         return null;
     }
@@ -1454,23 +1412,9 @@ public class LLVM implements Visitor {
         // Check if it's a variable or parameter in varMap
         if (varMap.containsKey(varName)) {
             String varPtr = varMap.get(varName);
-            
-            // Si empieza con % o @, es un puntero y necesitamos hacer load
-            if (varPtr.startsWith("%") || varPtr.startsWith("@")) {
-                // Si es un parámetro por valor (no empieza con %result), usar directamente
-                if (varPtr.startsWith("%") && !varPtr.contains("result") && !varPtr.startsWith("%t")) {
-                    // Es un parámetro formal, usar directamente
-                    return varPtr;
-                }
-                
-                // Es una variable o parámetro var, necesitamos cargar el valor
-                String result = newTemp();
-                emit(result + " = load i32, ptr " + varPtr + ", align 4");
-                return result;
-            } else {
-                // Es un valor constante (inline substitution)
-                return varPtr;
-            }
+            // Retornar el puntero directamente (@ o %)
+            // El load se hace en visitVnameExpression si es necesario
+            return varPtr;
         }
         
         throw new RuntimeException("Variable not found: " + varName);
@@ -1478,13 +1422,16 @@ public class LLVM implements Visitor {
 
     @Override
     public Object visitSubscriptVname(SubscriptVname ast, Object o) {
+        // Array subscript: arr[index]
         String basePtr = (String) ast.V.visit(this, o);
-        String index = (String) ast.E.visit(this, o);
+        String index = (String) ast.E.visit(this, null);
         String varType = (String) ast.V.type.visit(this, o);
         
+        // Convertir índice a i64 para getelementptr
         String index64 = newTemp();
         emit(index64 + " = sext i32 " + index + " to i64");
         
+        // Usar getelementptr para calcular la dirección del elemento
         String elementPtr = newTemp();
         emit(elementPtr + " = getelementptr inbounds " + varType + ", ptr " + basePtr + ", i64 0, i64 " + index64);
         return elementPtr;
